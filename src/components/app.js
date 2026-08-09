@@ -31,10 +31,12 @@ function panelDefs() {
 const PANEL_IDS = Object.keys(PANEL_META);
 
 const defaultLayout = () => tree.split("row", [
-  tree.tabs(["mark"]),
-  tree.split("col", [tree.tabs(["atlas"]), tree.tabs(["tiling", "preview3d"])], [0.58, 0.42]),
+  tree.split("col", [
+    tree.split("row", [tree.tabs(["atlas"]), tree.tabs(["preview3d"])], [0.5, 0.5]),
+    tree.split("row", [tree.tabs(["mark"]), tree.tabs(["tiling"])], [0.5, 0.5]),
+  ], [0.5, 0.5]),
   tree.tabs(["properties"]),
-], [0.44, 0.36, 0.2]);
+], [0.78, 0.22]);
 
 function canvasHost() {
   const el = document.createElement("div");

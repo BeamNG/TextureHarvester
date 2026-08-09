@@ -2,6 +2,8 @@
 
 Mark a surface in a photograph, get a flat tiling texture with a full PBR material out.
 
+**Live:** [beamng.github.io/TextureHarvester](https://beamng.github.io/TextureHarvester/)
+
 ![Texture Harvester](assets/demo.gif)
 
 ## Develop

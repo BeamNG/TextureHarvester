@@ -156,7 +156,7 @@ async function run() {
   const propsIndex = row.children.findIndex(
     c => c.type === "tabs" && c.panels.includes("properties"));
   check("a same-direction split extends the existing row",
-    row.dir === "row" && row.children.length === 4, `${row.dir} children=${row.children.length}`);
+    row.dir === "row" && row.children.length === 3, `${row.dir} children=${row.children.length}`);
   check("the panel landed on the side it was dropped",
     propsIndex > 0 && row.children[propsIndex - 1].panels.join(",") === "tiling",
     row.children.map(c => (c.panels || []).join("+")).join(" | "));
@@ -186,9 +186,12 @@ async function run() {
     y: markRect.bottom - 5,
   });
   const markParent = dock.findParent(app.dockState.root, dock.findPanel(app.dockState.root, "mark").id);
+  const markAt = markParent
+    ? markParent.children.findIndex(c => c.panels && c.panels.includes("mark")) : -1;
   check("a perpendicular split nests a new column",
-    !!markParent && markParent.dir === "col"
-    && markParent.children[1].panels.join(",") === "tiling",
+    !!markParent && markParent.dir === "col" && markAt >= 0
+    && markParent.children[markAt + 1]
+    && markParent.children[markAt + 1].panels.join(",") === "tiling",
     markParent ? `${markParent.dir} ${markParent.children.map(c => (c.panels || []).join("+")).join("/")}` : "none");
 
   // ---- tear a panel off into a floating window ---------------------------
