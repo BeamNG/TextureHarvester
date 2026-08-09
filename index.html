@@ -3,6 +3,10 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#141518" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="referrer" content="no-referrer" />
 
     <!--
       Ask not to be cached, because the whole application is this one file at one unchanging
@@ -23,12 +27,60 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
 
-    <title>Texture Harvester</title>
+    <title>Texture Harvester — tiling textures from photographs</title>
     <meta name="description" content="Mark a surface in a photograph, get a flat tiling texture with a full PBR material out. One self-contained HTML file: no server, no install, no network." />
+    <meta name="application-name" content="Texture Harvester" />
+    <meta name="author" content="Thomas Fischer" />
+    <link rel="canonical" href="https://beamng.github.io/TextureHarvester/" />
+    <link rel="license" href="https://opensource.org/licenses/MIT" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Texture Harvester" />
+    <meta property="og:title" content="Texture Harvester — tiling textures from photographs" />
+    <meta property="og:description" content="Mark a surface in a photograph, get a flat tiling texture with a full PBR material out. One self-contained HTML file: no server, no install, no network." />
+    <meta property="og:url" content="https://beamng.github.io/TextureHarvester/" />
+    <meta property="og:image" content="https://raw.githubusercontent.com/BeamNG/TextureHarvester/main/assets/demo.gif" />
+    <meta property="og:image:alt" content="Texture Harvester marking a surface and extracting a tiling material" />
+    <meta property="og:locale" content="en_US" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Texture Harvester — tiling textures from photographs" />
+    <meta name="twitter:description" content="Mark a surface in a photograph, get a flat tiling texture with a full PBR material out. One self-contained HTML file." />
+    <meta name="twitter:image" content="https://raw.githubusercontent.com/BeamNG/TextureHarvester/main/assets/demo.gif" />
+
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Texture Harvester" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23141518'/%3E%3Cpath fill='%234fc3f7' d='M7 9h10l2 3h6v12H7zm2 5v8h14v-6h-5.5l-2-3H9z'/%3E%3Cpath fill='%2366bb6a' d='M11 18h4v4h-4zm6 0h4v4h-4z'/%3E%3C/svg%3E" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Texture Harvester",
+        "url": "https://beamng.github.io/TextureHarvester/",
+        "description": "Mark a surface in a photograph, get a flat tiling texture with a full PBR material out. One self-contained HTML file: no server, no install, no network.",
+        "applicationCategory": "DesignApplication",
+        "operatingSystem": "Any",
+        "browserRequirements": "Requires WebGL2",
+        "license": "https://opensource.org/licenses/MIT",
+        "author": {
+          "@type": "Person",
+          "name": "Thomas Fischer"
+        },
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        }
+      }
+    </script>
   </head>
   <body>
     <div id="app"></div>
-    <noscript>Texture Harvester requires JavaScript and WebGL.</noscript>
+    <noscript>Texture Harvester requires JavaScript and WebGL2.</noscript>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
