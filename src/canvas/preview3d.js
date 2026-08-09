@@ -17,6 +17,17 @@ const SWAY_PITCH = 0.05;
 const SWAY_YAW_PERIOD = 11;
 const SWAY_PITCH_PERIOD = 7;
 
+function isSupported() {
+  if (!TX.warp.isSupported()) return false;
+  try {
+    const probe = document.createElement("canvas");
+    const gl = probe.getContext("webgl2", { failIfMajorPerformanceCaveat: false });
+    return !!gl;
+  } catch (err) {
+    return false;
+  }
+}
+
 function createPreview3d(container) {
   const store = TX.store;
   const state = store.state;
@@ -25,7 +36,18 @@ function createPreview3d(container) {
   canvas.className = "tx-3d-canvas";
   container.appendChild(canvas);
 
-  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+  } catch (err) {
+    if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
+    return null;
+  }
+  if (!renderer.getContext()) {
+    renderer.dispose();
+    if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
+    return null;
+  }
   renderer.setClearAlpha(0);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -352,12 +374,22 @@ function createPreview3d(container) {
     renderer.render(scene, camera);
   }
 
+  let onLost = null;
+  let stopWatch = null;
+
+  const onContextLost = event => {
+    event.preventDefault();
+    if (disposed) return;
+    if (onLost) onLost();
+  };
+  canvas.addEventListener("webglcontextlost", onContextLost, false);
+
   const observer = new ResizeObserver(resize);
   observer.observe(container);
   resize();
   frame = requestAnimationFrame(tick);
 
-  const stopWatch = watch(
+  stopWatch = watch(
     () => {
       const node = selected();
       const pixels = node ? `${node.id}:${store.textureKey(node.id)}` : "none";
@@ -392,10 +424,12 @@ function createPreview3d(container) {
     refresh,
     fit,
     sway,
+    set onLost(fn) { onLost = fn; },
     dispose() {
       disposed = true;
       cancelAnimationFrame(frame);
-      stopWatch();
+      canvas.removeEventListener("webglcontextlost", onContextLost, false);
+      if (stopWatch) stopWatch();
       observer.disconnect();
       controls.dispose();
       clearTextures();
@@ -412,5 +446,5 @@ function createPreview3d(container) {
   };
 }
 
-TX.preview3d = { createPreview3d };
+TX.preview3d = { createPreview3d, isSupported };
 

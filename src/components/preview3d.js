@@ -31,7 +31,7 @@ TX.components.Preview3d = {
     };
   },
   data() {
-    return { view: null, exporting: false };
+    return { view: null, exporting: false, glOk: true };
   },
   computed: {
     shapes() {
@@ -99,6 +99,14 @@ TX.components.Preview3d = {
       if (this.view) this.view.fit();
     },
 
+    loseGl() {
+      if (this.view) {
+        this.view.dispose();
+        this.view = null;
+      }
+      this.glOk = false;
+    },
+
     estimateDepth() {
       if (!this.photo) return;
       this.state.settings.depth.enabled = true;
@@ -127,8 +135,16 @@ TX.components.Preview3d = {
   mounted() {
     this.$nextTick(() => {
       const stage = this.$refs.stage;
-      if (!stage) return;
+      if (!stage || !TX.preview3d.isSupported()) {
+        this.glOk = false;
+        return;
+      }
       this.view = TX.preview3d.createPreview3d(stage);
+      if (!this.view) {
+        this.glOk = false;
+        return;
+      }
+      this.view.onLost = () => this.loseGl();
     });
   },
   beforeUnmount() {
@@ -138,8 +154,11 @@ TX.components.Preview3d = {
   template: `
     <div class="tx-props tx-3d">
       <div class="tx-3d-viewport" ref="stage"
-           v-tip="t('preview3d.viewport.tip')">
-        <div v-if="!hasSubject" class="tx-3d-empty">
+           v-tip="glOk ? t('preview3d.viewport.tip') : ''">
+        <div v-if="!glOk" class="tx-3d-empty">
+          <p>{{ t('preview3d.unsupported') }}</p>
+        </div>
+        <div v-else-if="!hasSubject" class="tx-3d-empty">
           <template v-if="photoBusy">
             {{ t('preview3d.empty.estimating', { progress: photoProgress }) }}
           </template>
@@ -157,7 +176,7 @@ TX.components.Preview3d = {
           </template>
         </div>
 
-        <div class="tx-viewport-tools tx-3d-tools">
+        <div v-if="glOk" class="tx-viewport-tools tx-3d-tools">
           <template v-if="!photo">
             <v-btn v-for="option in shapes" :key="option.value"
                    :icon="icons[option.icon]" size="x-small" variant="text"

@@ -12,6 +12,8 @@ const PIVOT_GRAB = 9;
 const CURVE_STEPS = 12;
 const HOVER_SLOP = 10;
 const LINE_DRAG_MIN = 6;
+const TOUCH_MOVE_MAX = 10;
+const LONG_PRESS_MS = 420;
 const PRECISION_FACTOR = 0.2;
 const LOUPE_RADIUS = 80;
 const LOUPE_SAMPLE_MIN = 12;
@@ -46,7 +48,22 @@ const COLORS = {
 function createMarkCanvas(container, hooks) {
   const store = TX.store;
   const state = store.state;
-  const stage = TX.stage.createStage(container, { onViewChange: hooks.onViewChange });
+  let drag = null;
+  let hold = null;
+  const clearHold = () => {
+    if (hold && hold.timer) clearTimeout(hold.timer);
+    hold = null;
+  };
+  const stage = TX.stage.createStage(container, {
+    onViewChange: hooks.onViewChange,
+    onPinchStart: () => {
+      clearHold();
+      drag = null;
+      marquee = null;
+      weldTarget = null;
+      setMarking(null);
+    },
+  });
   const geometry = makeQuadGeometry();
   const meshes = new Map();
 
@@ -630,7 +647,6 @@ function createMarkCanvas(container, hooks) {
   }
 
 
-  let drag = null;
   let marquee = null;
   let marking = null;
   let hoveredMarkId = null;
@@ -664,9 +680,14 @@ function createMarkCanvas(container, hooks) {
   }
 
   const markingAt = (event, screen) => {
-    if (!(event.ctrlKey || event.metaKey)) return null;
+    const touch = event.pointerType === "touch";
+    const placeMod = event.ctrlKey || event.metaKey
+      || (touch && state.pending.points.length > 0);
+    if (!placeMod) return null;
     const image = imageAt(stage.screenToWorld(screen.x, screen.y));
-    return image ? { type: "place", imageId: image.id, screen } : null;
+    if (!image) return null;
+    if (state.pending.points.length && state.pending.imageId !== image.id) return null;
+    return { type: "place", imageId: image.id, screen };
   };
 
   function loupeGesture() {
@@ -700,9 +721,11 @@ function createMarkCanvas(container, hooks) {
   }
 
   function onPointerDown(event) {
+    if (stage.isPinching()) return;
     const screen = stage.pointerPosition(event);
     const world = stage.screenToWorld(screen.x, screen.y);
     container.focus();
+    clearHold();
 
     if (event.button === 1) {
       drag = { type: "pan", last: screen };
@@ -712,15 +735,9 @@ function createMarkCanvas(container, hooks) {
     }
     if (event.button !== 0) return;
 
-    if (event.ctrlKey || event.metaKey) {
-      const image = imageAt(world);
-      if (image) {
-        drag = { type: "line", imageId: image.id, from: screen, to: screen, moved: false };
-        setMarking({ type: "place", imageId: image.id, screen });
-        overlaySetPointerCapture(event);
-      }
-      return;
-    }
+    const touch = event.pointerType === "touch";
+    const placeMod = event.ctrlKey || event.metaKey
+      || (touch && state.pending.points.length > 0);
 
     if (event.altKey) {
       const mark = markAt(world);
@@ -757,6 +774,16 @@ function createMarkCanvas(container, hooks) {
       return;
     }
 
+    if (placeMod) {
+      const image = imageAt(world);
+      if (image && (!state.pending.points.length || state.pending.imageId === image.id)) {
+        drag = { type: "line", imageId: image.id, from: screen, to: screen, moved: false };
+        setMarking({ type: "place", imageId: image.id, screen });
+        overlaySetPointerCapture(event);
+        return;
+      }
+    }
+
     const mark = markAt(world);
     if (mark) {
       if (event.shiftKey) store.toggleSelected("mark", mark.id);
@@ -777,6 +804,37 @@ function createMarkCanvas(container, hooks) {
 
     const image = imageAt(world);
     if (image) {
+      if (touch) {
+        drag = {
+          type: "touch-pending",
+          imageId: image.id,
+          origin: world,
+          startScreen: { x: screen.x, y: screen.y },
+          moved: false,
+        };
+        overlaySetPointerCapture(event);
+        hold = {
+          pointerId: event.pointerId,
+          screen: { x: screen.x, y: screen.y },
+          imageId: image.id,
+          timer: setTimeout(() => {
+            if (!hold || hold.pointerId !== event.pointerId) return;
+            hold = null;
+            if (!drag || drag.type !== "touch-pending") return;
+            drag = {
+              type: "line",
+              imageId: image.id,
+              from: screen,
+              to: screen,
+              moved: false,
+            };
+            setMarking({ type: "place", imageId: image.id, screen });
+            stage.requestRender();
+            if (navigator.vibrate) navigator.vibrate(12);
+          }, LONG_PRESS_MS),
+        };
+        return;
+      }
       if (event.shiftKey) store.toggleSelected("image", image.id);
       else if (!store.isSelected("image", image.id)) store.select("image", image.id);
       drag = {
@@ -828,7 +886,33 @@ function createMarkCanvas(container, hooks) {
   }
 
   function onPointerMove(event) {
+    if (stage.isPinching()) {
+      clearHold();
+      drag = null;
+      return;
+    }
     const screen = stage.pointerPosition(event);
+
+    if (drag && drag.type === "touch-pending") {
+      const dist = Math.hypot(screen.x - drag.startScreen.x, screen.y - drag.startScreen.y);
+      if (dist > TOUCH_MOVE_MAX) {
+        clearHold();
+        const image = store.findImage(drag.imageId);
+        if (!image) {
+          drag = null;
+          return;
+        }
+        if (!store.isSelected("image", image.id)) store.select("image", image.id);
+        drag = {
+          type: "image",
+          origin: drag.origin,
+          start: store.selectedItems("image").map(node => ({
+            id: node.id, x: node.x, y: node.y,
+          })),
+        };
+      }
+      return;
+    }
 
     if (!drag) {
       setMarking(markingAt(event, screen));
@@ -932,6 +1016,35 @@ function createMarkCanvas(container, hooks) {
   }
 
   function onPointerUp(event) {
+    if (stage.isPinching()) {
+      clearHold();
+      drag = null;
+      return;
+    }
+
+    if (drag && drag.type === "touch-pending") {
+      clearHold();
+      const image = store.findImage(drag.imageId);
+      const screen = drag.startScreen;
+      const world = stage.screenToWorld(screen.x, screen.y);
+      drag = null;
+      if (image) {
+        if (state.pending.points.length && state.pending.imageId === image.id) {
+          addPendingPoint(image, world, screen);
+        } else if (event.shiftKey) {
+          store.toggleSelected("image", image.id);
+        } else {
+          store.select("image", image.id);
+        }
+      }
+      stage.requestRender();
+      try {
+        stage.overlay.releasePointerCapture(event.pointerId);
+      } catch (err) {
+      }
+      return;
+    }
+
     if (drag && (drag.type === "point" || drag.type === "pivot")
         && hooks && hooks.onMarkGeometryChange) {
       hooks.onMarkGeometryChange(drag.markId);
@@ -993,6 +1106,7 @@ function createMarkCanvas(container, hooks) {
 
   function onContextMenu(event) {
     event.preventDefault();
+    if (drag) return;
     if (state.pending.points.length) {
       store.clearPending();
       stage.requestRender();

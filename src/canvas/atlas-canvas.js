@@ -41,11 +41,13 @@ const rotate = (x, y, angle) => {
 function createAtlasCanvas(container, hooks) {
   const store = TX.store;
   const state = store.state;
+  let drag = null;
   const stage = TX.stage.createStage(container, {
     onViewChange: view => {
       syncDetail();
       if (hooks.onViewChange) hooks.onViewChange(view);
     },
+    onPinchStart: () => { drag = null; marquee = null; },
   });
   const geometry = makeQuadGeometry();
   const meshes = new Map();
@@ -346,7 +348,6 @@ function createAtlasCanvas(container, hooks) {
   }
 
 
-  let drag = null;
   let marquee = null;
   let localHint = false;
 
@@ -526,6 +527,7 @@ function createAtlasCanvas(container, hooks) {
   }
 
   function onPointerDown(event) {
+    if (stage.isPinching()) return;
     const screen = stage.pointerPosition(event);
     const world = stage.screenToWorld(screen.x, screen.y);
     container.focus();
@@ -606,6 +608,10 @@ function createAtlasCanvas(container, hooks) {
   }
 
   function onPointerMove(event) {
+    if (stage.isPinching()) {
+      drag = null;
+      return;
+    }
     const screen = stage.pointerPosition(event);
 
     if (!drag) {

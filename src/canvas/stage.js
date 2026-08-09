@@ -229,6 +229,66 @@ function createStage(container, options) {
     if (needsRender) renderNow();
   }
 
+  // Two-finger pinch/pan — tablets have no scroll wheel.
+  const touches = new Map();
+  let pinch = null;
+  let pinching = false;
+
+  const clientToScreen = (clientX, clientY) => {
+    const rect = overlay.getBoundingClientRect();
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  };
+
+  const touchPair = () => {
+    if (touches.size < 2) return null;
+    const pts = [];
+    touches.forEach(p => pts.push(p));
+    const a = pts[0];
+    const b = pts[1];
+    return {
+      mid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+      dist: Math.hypot(a.x - b.x, a.y - b.y) || 1,
+    };
+  };
+
+  const endPinch = () => {
+    pinching = false;
+    pinch = null;
+  };
+
+  function onTouchTrack(event) {
+    if (event.pointerType !== "touch") return;
+    if (event.type === "pointerdown" || event.type === "pointermove") {
+      touches.set(event.pointerId, clientToScreen(event.clientX, event.clientY));
+    } else {
+      touches.delete(event.pointerId);
+    }
+
+    const pair = touchPair();
+    if (!pair) {
+      endPinch();
+      return;
+    }
+
+    if (!pinching) {
+      pinching = true;
+      pinch = { dist: pair.dist, mid: pair.mid };
+      if (settings.onPinchStart) settings.onPinchStart();
+      return;
+    }
+
+    const last = pinch;
+    pinch = { dist: pair.dist, mid: pair.mid };
+    panBy(pair.mid.x - last.mid.x, pair.mid.y - last.mid.y);
+    setZoom(view.zoom * (pair.dist / last.dist), pair.mid);
+    event.preventDefault();
+  }
+
+  overlay.addEventListener("pointerdown", onTouchTrack, true);
+  overlay.addEventListener("pointermove", onTouchTrack, true);
+  overlay.addEventListener("pointerup", onTouchTrack, true);
+  overlay.addEventListener("pointercancel", onTouchTrack, true);
+
   const observer = new ResizeObserver(resize);
   observer.observe(container);
   resize();
@@ -238,6 +298,10 @@ function createStage(container, options) {
     disposed = true;
     cancelAnimationFrame(frame);
     observer.disconnect();
+    overlay.removeEventListener("pointerdown", onTouchTrack, true);
+    overlay.removeEventListener("pointermove", onTouchTrack, true);
+    overlay.removeEventListener("pointerup", onTouchTrack, true);
+    overlay.removeEventListener("pointercancel", onTouchTrack, true);
     renderer.dispose();
     glCanvas.remove();
     overlay.remove();
@@ -268,6 +332,7 @@ function createStage(container, options) {
     renderNow,
     drawGrid,
     dispose,
+    isPinching: () => pinching,
     setOverlayPainter(fn) { drawOverlay = fn; requestRender(); },
     get cursor() { return overlay.style.cursor; },
     set cursor(value) { overlay.style.cursor = value; },

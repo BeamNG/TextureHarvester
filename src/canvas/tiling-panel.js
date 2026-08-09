@@ -14,12 +14,14 @@ const COLORS = {
 function createTilingPanel(container, hooks) {
   const store = TX.store;
   const state = store.state;
+  let drag = null;
   const stage = TX.stage.createStage(container, {
     onViewChange: view_ => {
       refresh(false);
       const onView = (hooks || {}).onViewChange;
       if (onView) onView(view_);
     },
+    onPinchStart: () => { drag = null; },
   });
 
   const geometry = TX.stage.makeQuadGeometry();
@@ -177,10 +179,8 @@ function createTilingPanel(container, hooks) {
 
   let skipAutoFit = false;
 
-
-  let drag = null;
-
   stage.overlay.addEventListener("pointerdown", event => {
+    if (stage.isPinching()) return;
     if (event.button !== 0 && event.button !== 1) return;
     drag = { last: stage.pointerPosition(event) };
     try {
@@ -190,6 +190,10 @@ function createTilingPanel(container, hooks) {
     event.preventDefault();
   });
   stage.overlay.addEventListener("pointermove", event => {
+    if (stage.isPinching()) {
+      drag = null;
+      return;
+    }
     if (!drag) return;
     const at = stage.pointerPosition(event);
     stage.panBy(at.x - drag.last.x, at.y - drag.last.y);

@@ -74,6 +74,7 @@ const HELP_GROUPS = [
     ["help.mark.delete", "help.mark.delete.keys"],
     ["help.mark.move_point", "help.mark.move_point.keys"],
     ["help.mark.precision", "help.mark.precision.keys"],
+    ["help.mark.pinch", "help.mark.pinch.keys"],
     ["help.mark.weld", "help.mark.weld.keys"],
     ["help.mark.bow", "help.mark.bow.keys"],
     ["help.mark.s_curve", "help.mark.s_curve.keys"],
