@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.0] — 2026-08-10
+
+### Added
+- Mark corners can be dragged outside the photograph; the overhang fills red and those handles turn red
+- Richer `index.html` metadata: Open Graph / Twitter cards, theme colour, canonical URL, JSON-LD, and an inline SVG favicon
+
+### Notes
+- Samples outside the photo stay transparent in the extract (unchanged warp behaviour)
+
 ## [0.2.0] — 2026-08-09
 
 ### Added

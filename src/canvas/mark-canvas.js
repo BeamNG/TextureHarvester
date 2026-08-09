@@ -31,9 +31,11 @@ const COLORS = {
   markSelected: "#4fc3f7",
   markFill: "rgba(102,187,106,0.14)",
   markFillDirty: "rgba(255,179,0,0.14)",
+  markFillOutside: "rgba(239,83,80,0.28)",
   markBase: "rgba(255,255,255,0.28)",
   localGrid: "rgba(255,255,255,0.28)",
   point: "#ffffff",
+  pointOutside: "#ef5350",
   pointStroke: "#222222",
   pivot: "#ffd54f",
   pivotBent: "#ffa000",
@@ -205,10 +207,29 @@ function createMarkCanvas(container, hooks) {
 
     const selected = store.isSelected("mark", mark.id);
     const revealing = revealFade(mark.id);
+    const fill = dirty ? COLORS.markFillDirty : COLORS.markFill;
+    const outside = mark.points.some(p =>
+      p.x < 0 || p.y < 0 || p.x > image.width || p.y > image.height);
 
     strokePath(ctx, outline);
-    ctx.fillStyle = dirty ? COLORS.markFillDirty : COLORS.markFill;
-    ctx.fill();
+    if (outside) {
+      ctx.fillStyle = COLORS.markFillOutside;
+      ctx.fill();
+      ctx.save();
+      const clip = nodeCorners(image).map(c => stage.worldToScreen(c.x, c.y));
+      ctx.beginPath();
+      ctx.moveTo(clip[0].x, clip[0].y);
+      for (let i = 1; i < clip.length; i++) ctx.lineTo(clip[i].x, clip[i].y);
+      ctx.closePath();
+      ctx.clip();
+      strokePath(ctx, outline);
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.restore();
+    } else {
+      ctx.fillStyle = fill;
+      ctx.fill();
+    }
     ctx.lineWidth = selected ? 3 : 2;
     ctx.strokeStyle = selected
       ? COLORS.markSelected
@@ -234,10 +255,14 @@ function createMarkCanvas(container, hooks) {
 
     if (mark.id === hoveredMarkId || selected) paintLocalGrid(ctx, mark, geo);
 
-    for (const p of corners) {
+    for (let i = 0; i < corners.length; i++) {
+      const p = corners[i];
+      const local = mark.points[i];
+      const oob = local.x < 0 || local.y < 0
+        || local.x > image.width || local.y > image.height;
       ctx.beginPath();
       ctx.arc(p.x, p.y, POINT_RADIUS, 0, Math.PI * 2);
-      ctx.fillStyle = COLORS.point;
+      ctx.fillStyle = oob ? COLORS.pointOutside : COLORS.point;
       ctx.fill();
       ctx.lineWidth = 1.5;
       ctx.strokeStyle = COLORS.pointStroke;
@@ -958,8 +983,8 @@ function createMarkCanvas(container, hooks) {
       const weld = drag.precision ? null : weldCandidate(image, screen, drag);
       weldTarget = weld ? weld.screen : null;
       store.setMarkPoint(drag.markId, drag.index, weld ? weld.point : {
-        x: Math.max(0, Math.min(image.width, local.x)),
-        y: Math.max(0, Math.min(image.height, local.y)),
+        x: local.x,
+        y: local.y,
       });
       requestExtract(drag.markId);
       stage.requestRender();
