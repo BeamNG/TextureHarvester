@@ -198,7 +198,10 @@ TX.components.StatusBar = {
     storageWarning() {
       void this.i18n.locale;
       if (this.storageKind === "memory") return this.t("status.storage.memory");
-      if (this.storageKind === "localstorage") return this.t("status.storage.localstorage");
+      // file:// normally uses localStorage — that is not a degraded fallback to announce.
+      if (this.storageKind === "localstorage" && location.protocol !== "file:") {
+        return this.t("status.storage.localstorage");
+      }
       return "";
     },
     storageColor() {

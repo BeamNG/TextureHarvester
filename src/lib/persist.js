@@ -55,7 +55,7 @@ function openIndexedDb() {
       const db = request.result;
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
     };
-    // No wall timer: --virtual-time-budget would fire it before onsuccess.
+    // No wall timer: --virtual-time-budget fires it before onsuccess.
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error || new Error("indexedDB open failed"));
     request.onblocked = () => reject(new Error("indexedDB blocked"));
@@ -108,19 +108,24 @@ function memoryAdapter() {
   };
 }
 
+const fileOrigin = () => typeof location !== "undefined" && location.protocol === "file:";
+
+function localStorageOrMemory() {
+  try {
+    return localStorageAdapter();
+  } catch (err) {
+    return memoryAdapter();
+  }
+}
+
 let adapterPromise = null;
 
 function adapter() {
   if (adapterPromise) return adapterPromise;
-  adapterPromise = openIndexedDb()
-    .then(indexedDbAdapter)
-    .catch(() => {
-      try {
-        return localStorageAdapter();
-      } catch (err) {
-        return memoryAdapter();
-      }
-    });
+  // file:// + virtual-time never settles indexedDB.open; the shipped page is a file anyway.
+  adapterPromise = fileOrigin()
+    ? Promise.resolve().then(localStorageOrMemory)
+    : openIndexedDb().then(indexedDbAdapter).catch(localStorageOrMemory);
   return adapterPromise;
 }
 
@@ -131,7 +136,7 @@ function allStores() {
   storesPromise = (async () => {
     const primary = await adapter();
     const stores = [primary];
-    if (primary.kind !== "indexeddb") {
+    if (primary.kind !== "indexeddb" && !fileOrigin()) {
       try {
         stores.push(indexedDbAdapter(await openIndexedDb()));
       } catch (err) {
