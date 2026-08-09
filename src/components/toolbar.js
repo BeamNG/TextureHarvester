@@ -21,6 +21,11 @@ TX.components.Toolbar = {
         Texture&nbsp;Harvester<span class="tx-version">{{ version }}</span>
       </div>
 
+      <v-btn variant="text" size="small" class="tx-github" :prepend-icon="icons.github"
+             href="https://github.com/BeamNG/TextureHarvester"
+             target="_blank" rel="noopener noreferrer"
+             v-tip="t('toolbar.github.tip')">{{ t('toolbar.github') }}</v-btn>
+
       <v-btn variant="tonal" size="small" class="tx-action" :prepend-icon="icons.load"
              v-tip="t('toolbar.import.tip')"
              @click="$emit('import')">{{ t('toolbar.import') }}</v-btn>

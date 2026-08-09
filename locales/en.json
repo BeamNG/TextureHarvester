@@ -1,6 +1,8 @@
 {
   "meta.language_name": "English",
   "toolbar.brand.tip": "Texture Harvester {version} — photographs in, tiling textures and materials out. MIT licensed; the notices are with the shortcuts, under the cog or F1",
+  "toolbar.github": "GitHub",
+  "toolbar.github.tip": "Source on GitHub",
   "toolbar.import": "Import",
   "toolbar.import.tip": "Import photographs to cut textures out of  (Shift+A)",
   "toolbar.undo.hint": "Undo {label}  (Ctrl+Z)",
