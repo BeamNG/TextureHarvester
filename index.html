@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!--
+      Ask not to be cached, because the whole application is this one file at one unchanging
+      address. There is no hashed bundle name to make a new release look like a new URL, so a
+      cached copy is a stale copy of everything, and the usual symptom is someone reporting a bug
+      that was fixed a week ago.
+
+      Best effort rather than a guarantee: these are hints to the browser, and GitHub Pages serves
+      its own `Cache-Control: max-age=600` that cannot be configured, so a reload within ten
+      minutes may still be answered from cache. Nothing here can change that; what these do is
+      stop the copy already in the browser from outliving it.
+
+      Saving the page for offline use is unaffected - that is a file on disk, not a cache entry -
+      and so is everything the app has stored, which lives in IndexedDB and localStorage and has
+      nothing to do with HTTP caching.
+    -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+
+    <title>Texture Harvester</title>
+    <meta name="description" content="Mark a surface in a photograph, get a flat tiling texture with a full PBR material out. One self-contained HTML file: no server, no install, no network." />
+  </head>
+  <body>
+    <div id="app"></div>
+    <noscript>Texture Harvester requires JavaScript and WebGL.</noscript>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

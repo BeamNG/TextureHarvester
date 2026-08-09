@@ -1,0 +1,36 @@
+---
+description: How to write CHANGELOG.md entries
+globs: CHANGELOG.md
+alwaysApply: false
+---
+
+# Changelog
+
+As short as possible. User-facing changes only.
+
+- One line per change, saying what a user can now do or what behaves differently.
+- Keep a Changelog headings (Added / Changed / Fixed / Removed), newest release first.
+- Bump `version` in `package.json` alongside a new release heading.
+
+Leave out entirely — no entry, not even a short one:
+
+- build, test, CI, tooling, dependency and refactor work
+- file, function or module names
+- why the change was made, or how it was implemented
+
+```markdown
+<!-- BAD: not user-facing -->
+### Build and test
+- `selftest` and `inttest` run in headless Chrome against the real bundle.
+
+<!-- BAD: implementation detail and reasoning -->
+- Corners weld through a shared-vertex map, so adjacent quads sample the same edge
+  instead of each interpolating their own.
+
+<!-- GOOD -->
+### Added
+- Curved mark edges, two Bézier handles per side.
+
+### Fixed
+- Atlas packing no longer overlaps rotated slices.
+```

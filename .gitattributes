@@ -1,0 +1,7 @@
+# The build and the test suite run on Linux, so text is stored and checked out with LF
+# whatever a contributor's editor does locally.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.gif binary

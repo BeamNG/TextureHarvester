@@ -1,0 +1,26 @@
+---
+description: Every UI string lives in all locales, not just English
+globs: src/**/*.js,locales/*.json
+alwaysApply: false
+---
+
+# Translations
+
+User-visible text goes through `t("some.id")` — never a literal in a template or a JS string.
+
+`locales/en.json` is the source of truth. Adding, renaming or removing a key there means doing
+the same in all 19 other `locales/*.json`, actually translated, in the same key order. A key
+that exists only in English is an unfinished change, not a fallback.
+
+Editing an English string means retranslating it in all 19 too. Nothing catches that — the
+build only warns about *missing* keys, never stale ones, and `scripts/compile-i18n.mjs` fills
+a missing key in from English rather than failing. So verify before calling the work done:
+
+```bash
+npm run i18n   # any "<code>: N keys falling back to English" line means it is not done
+```
+
+- `{placeholder}` names stay identical across locales.
+- `*_one` / `*_other` plural pairs are added and removed together.
+- `meta.language_name` is written in its own language.
+- `src/lib/i18n-data.js` is generated — never edit it.

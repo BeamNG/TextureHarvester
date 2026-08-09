@@ -1,0 +1,8 @@
+# Build output - regenerate with `npm run build`
+dist/
+
+node_modules/
+
+# Scratch files from local debugging
+_*
+*.log

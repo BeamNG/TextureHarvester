@@ -1,0 +1,101 @@
+name: Build, test, release and deploy
+
+# A `v*` tag is what releases and publishes. Pushes and pull requests only build and test, so
+# `main` cannot quietly go red and be discovered at the moment someone tags it.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+# Read is enough for everything except creating the release and deploying the page, and those
+# two take what they need a job at a time.
+permissions:
+  contents: read
+
+# One deployment at a time, and an in-flight publish is allowed to finish rather than being
+# cancelled halfway by the next one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      # The suite drives headless Chrome over the built pages - including the GPU warp,
+      # through SwiftShader, since the runner has no GPU - so a broken projection or a
+      # bundle that fails to load stops the release instead of shipping.
+      - name: Test
+        run: npm test
+
+      # Testing leaves the harness pages in dist/test. A plain `vite build` empties the
+      # directory before writing, so only the app survives into what gets published.
+      - name: Build
+        run: npm run build
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: dist
+          path: dist
+
+  release:
+    name: Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: dist
+          path: release
+
+      # The product is the one file, so that is what the release carries - under the product's
+      # own name rather than the index.html every build happens to write.
+      - name: Name the file after the product
+        run: cp release/index.html TextureHarvester.html
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: TextureHarvester.html
+          generate_release_notes: true
+
+  pages:
+    name: Deploy to GitHub Pages
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: dist
+          path: dist
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+      - id: deployment
+        uses: actions/deploy-pages@v5

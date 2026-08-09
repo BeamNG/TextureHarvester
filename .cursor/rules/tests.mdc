@@ -1,0 +1,30 @@
+---
+description: Keep the test suite current and green
+globs: src/**/*.js,CHANGELOG.md
+alwaysApply: false
+---
+
+# Tests
+
+`npm test` builds the bundle and drives three pages through headless Chrome. Needs Chrome or
+Edge installed; `CHROME=<path>` overrides detection.
+
+| Page | Covers |
+|------|--------|
+| `src/selftest.js` | Maths against the real bundle — the GPU warp versus the CPU implementation, homography, lens |
+| `src/inttest.js` | End to end through store, canvases, warp, material and export, driven as the UI drives them |
+| `src/uitest.js` | The mounted app under synthetic pointer events — docking, panels, selection |
+
+Every behaviour change lands with a check at the matching level, in the same commit. A feature
+with no check is unfinished.
+
+Run `npm test` before pushing, not just before a release: `.github/workflows/ci.yml` runs the same
+suite on every push and pull request, and again on a `v*` tag - where a failure stops the release
+and the deployment, so red at a tag means the published page does not update.
+
+- Add checks with the page's own `check(name, ok, detail)` — the runner looks for
+  `RESULT: ALL PASSED` and nothing else counts as a pass.
+- Never delete, skip or loosen a check to make the suite green. Fix the cause.
+- Never call work done on a red suite, and never leave `main` red.
+- A release also needs the suite run against the built artefact, which `npm test` already does —
+  it tests `dist/test/*.html`, not the sources.
