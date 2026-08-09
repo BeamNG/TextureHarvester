@@ -25,43 +25,42 @@ if (!browser) {
   process.exit(2);
 }
 
-const profile = mkdtempSync(join(tmpdir(), "tx-test-"));
-
 function runPage(name) {
-  const url = `file:///${join(root, "dist", "test", `${name}.html`).replace(/\\/g, "/")}`;
-  const dom = execFileSync(browser, [
-    "--headless=new",
-    "--disable-gpu",
-    "--enable-unsafe-swiftshader",
-    "--allow-file-access-from-files",
-    "--no-sandbox",
-    "--disable-dev-shm-usage",
-    // Image encoding and storage probes consume virtual time, not wall clock.
-    "--virtual-time-budget=12000000",
-    `--user-data-dir=${profile}`,
-    "--dump-dom",
-    url,
-  ], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+  const profile = mkdtempSync(join(tmpdir(), `tx-test-${name}-`));
+  try {
+    const url = `file:///${join(root, "dist", "test", `${name}.html`).replace(/\\/g, "/")}`;
+    const dom = execFileSync(browser, [
+      "--headless=new",
+      "--disable-gpu",
+      "--enable-unsafe-swiftshader",
+      "--allow-file-access-from-files",
+      "--no-sandbox",
+      "--disable-dev-shm-usage",
+      // Image encoding and storage probes consume virtual time, not wall clock.
+      "--virtual-time-budget=12000000",
+      `--user-data-dir=${profile}`,
+      "--dump-dom",
+      url,
+    ], { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
 
-  const open = dom.indexOf('<pre id="results">');
-  const close = dom.indexOf("</pre>", open);
-  if (open === -1 || close === -1) return { name, ok: false, output: "no results element in the page" };
+    const open = dom.indexOf('<pre id="results">');
+    const close = dom.indexOf("</pre>", open);
+    if (open === -1 || close === -1) return { name, ok: false, output: "no results element in the page" };
 
-  const output = dom.slice(open + '<pre id="results">'.length, close)
-    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
-  return { name, ok: output.includes("RESULT: ALL PASSED"), output };
+    const output = dom.slice(open + '<pre id="results">'.length, close)
+      .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&");
+    return { name, ok: output.includes("RESULT: ALL PASSED"), output };
+  } finally {
+    rmSync(profile, { recursive: true, force: true });
+  }
 }
 
 let failed = 0;
-try {
-  for (const name of ["selftest", "inttest", "uitest"]) {
-    console.log(`\n===== ${name} =====`);
-    const result = runPage(name);
-    console.log(result.output.trim());
-    if (!result.ok) failed++;
-  }
-} finally {
-  rmSync(profile, { recursive: true, force: true });
+for (const name of ["selftest", "inttest", "uitest"]) {
+  console.log(`\n===== ${name} =====`);
+  const result = runPage(name);
+  console.log(result.output.trim());
+  if (!result.ok) failed++;
 }
 
 console.log(failed ? `\n${failed} page(s) failed` : "\nall pages passed");

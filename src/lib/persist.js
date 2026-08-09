@@ -55,10 +55,10 @@ function openIndexedDb() {
       const db = request.result;
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
     };
+    // No wall timer: --virtual-time-budget would fire it before onsuccess.
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error || new Error("indexedDB open failed"));
     request.onblocked = () => reject(new Error("indexedDB blocked"));
-    setTimeout(() => reject(new Error("indexedDB open timed out")), 3000);
   });
 }
 
