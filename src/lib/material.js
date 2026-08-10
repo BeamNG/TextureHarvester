@@ -334,6 +334,127 @@ function warm(textureId) {
     settingsOf(store.state.settings.material), asset.version);
 }
 
+function colourMapsOn(settings) {
+  const s = settingsOf(settings);
+  return s.detailNormal > 0 || s.roughnessAmount > 0 || s.cavity > 0;
+}
+
+// Suggest + apply strengths. Caller warms maps under a progress bar.
+function applySuggestion(textureId) {
+  const store = TX.store;
+  const node = store.findTexture(textureId);
+  const asset = store.assets.textures.get(textureId);
+  const albedo = node && store.textureCanvas(textureId);
+  if (!node || !asset || !albedo) return null;
+
+  const advice = TX.pbr.suggest(textureId, albedo, asset.version);
+  if (!advice) return null;
+
+  const before = settingsOf(store.state.settings.material);
+  const next = advice.settings;
+  const changed = before.roughness !== next.roughness
+    || before.detailNormal !== next.detailNormal
+    || before.roughnessAmount !== next.roughnessAmount
+    || before.cavity !== next.cavity;
+
+  if (changed) {
+    TX.history.name("history.generate_pbr");
+    Object.assign(store.state.settings.material, next);
+  }
+
+  advice.changed = changed;
+  return advice;
+}
+
+function generateFrom(textureId) {
+  const advice = applySuggestion(textureId);
+  if (!advice) return null;
+  warm(textureId);
+  return advice;
+}
+
+const AUTO_MS = 500;
+let autoTimer = null;
+const autoPending = new Set();
+let autoFocus = null;
+let autoRunning = false;
+
+function cancelAuto() {
+  clearTimeout(autoTimer);
+  autoTimer = null;
+  autoPending.clear();
+  autoFocus = null;
+}
+
+function autoEnabled() {
+  return !!(TX.store.state.settings && TX.store.state.settings.autoPbr);
+}
+
+async function flushAuto() {
+  autoTimer = null;
+  if (autoRunning) return;
+  if (!autoEnabled()) {
+    autoPending.clear();
+    autoFocus = null;
+    return;
+  }
+
+  const ids = [...autoPending];
+  const focus = autoFocus;
+  autoPending.clear();
+  autoFocus = null;
+  if (!focus || !TX.store.findTexture(focus)) return;
+
+  autoRunning = true;
+  try {
+    await TX.progress.run(TX.t("props.material.progress.generating"), async report => {
+      const focusNode = TX.store.findTexture(focus);
+      const labelOf = (id, index, total) => {
+        const node = TX.store.findTexture(id);
+        return TX.t("props.material.progress.deriving", {
+          name: (node && node.name) || id,
+          index,
+          total,
+        });
+      };
+
+      let changed = false;
+      if (!colourMapsOn(TX.store.state.settings.material)) {
+        await report(0, TX.t("props.material.progress.reading", {
+          name: (focusNode && focusNode.name) || "",
+        }));
+        const advice = applySuggestion(focus);
+        if (!advice) return;
+        changed = !!advice.changed;
+      }
+
+      const rebuild = changed
+        ? TX.store.state.textures.map(texture => texture.id)
+        : [...new Set([focus, ...ids])].filter(id => TX.store.findTexture(id));
+      if (!rebuild.length) return;
+
+      await TX.progress.each(rebuild,
+        (id, i, total) => labelOf(id, i + 1, total),
+        id => { warm(id); });
+    });
+  } finally {
+    autoRunning = false;
+    if (autoPending.size && autoEnabled()) {
+      clearTimeout(autoTimer);
+      autoTimer = setTimeout(flushAuto, AUTO_MS);
+    }
+  }
+}
+
+function scheduleAuto(textureId) {
+  if (!textureId || !autoEnabled()) return;
+  autoPending.add(textureId);
+  autoFocus = textureId;
+  if (autoRunning) return;
+  clearTimeout(autoTimer);
+  autoTimer = setTimeout(flushAuto, AUTO_MS);
+}
+
 const EXPORT_CHANNELS = [
   {
     slot: "normal",
@@ -487,6 +608,11 @@ TX.material = {
   full,
   held,
   keyOf,
+  generateFrom,
+  applySuggestion,
+  scheduleAuto,
+  cancelAuto,
+  colourMapsOn,
   invalidate,
   extents,
   geometryFor,

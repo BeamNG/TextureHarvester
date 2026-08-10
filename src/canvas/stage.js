@@ -69,6 +69,7 @@ function createStage(container, options) {
     overlay.style.height = "";
 
     requestRender();
+    if (settings.onResize) settings.onResize(view);
   }
 
   function updateCamera() {
@@ -135,7 +136,9 @@ function createStage(container, options) {
   }
 
   function fitTo(bounds, margin) {
-    if (!bounds) return;
+    if (!bounds) return false;
+    // Hidden/parked panels report ~0 size; refuse so we do not bake MIN_ZOOM in.
+    if (view.width < 64 || view.height < 64) return false;
     const pad = margin == null ? 48 : margin;
     const width = Math.max(1, bounds.maxX - bounds.minX);
     const height = Math.max(1, bounds.maxY - bounds.minY);
@@ -148,6 +151,7 @@ function createStage(container, options) {
     view.panY = bounds.minY + height / 2;
     requestRender();
     viewportChanged();
+    return true;
   }
 
   function useWorldTransform() {

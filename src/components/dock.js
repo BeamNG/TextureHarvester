@@ -230,7 +230,10 @@ TX.components.Dock = {
         closable: id => !this.compact
           && (!this.panels[id] || this.panels[id].closable !== false),
         live: id => !!this.signals[id],
-        activate: id => { this.state.root = tree.setActive(this.state.root, id); },
+        activate: id => {
+          this.state.root = tree.setActive(this.state.root, id);
+          this.focusPanel(id);
+        },
         close: id => this.closePanel(id),
         open: id => this.openPanel(id),
         maximize: id => { this.state.maximized = this.state.maximized === id ? null : id; },
@@ -238,6 +241,15 @@ TX.components.Dock = {
         startSplitDrag: (node, index, event) => this.startSplitDrag(node, index, event),
         compact: () => this.compact,
       };
+    },
+
+    focusPanel(panelId) {
+      if (typeof panelId === "string" && panelId) TX.store.state.activePanel = panelId;
+    },
+
+    activateFloat(win, panelId) {
+      win.active = panelId;
+      this.focusPanel(panelId);
     },
 
     floatStyle(win) {
@@ -250,7 +262,10 @@ TX.components.Dock = {
       if (win) {
         win.panels = win.panels.filter(p => p !== panelId);
         if (!win.panels.length) this.state.floating = this.state.floating.filter(w => w !== win);
-        else if (win.active === panelId) win.active = win.panels[0];
+        else if (win.active === panelId) {
+          win.active = win.panels[0];
+          this.focusPanel(win.active);
+        }
       } else {
         const next = tree.removePanel(this.state.root, panelId);
         if (next) this.state.root = next;
@@ -262,6 +277,7 @@ TX.components.Dock = {
     openPanel(panelId) {
       if (tree.collectPanels(this.state.root).includes(panelId)) {
         this.state.root = tree.setActive(this.state.root, panelId);
+        this.focusPanel(panelId);
         return;
       }
       if (this.state.floating.some(w => w.panels.includes(panelId))) return;
@@ -270,6 +286,7 @@ TX.components.Dock = {
         if (root && root.type === "tabs") {
           root.panels = root.panels.concat(panelId);
           root.active = panelId;
+          this.focusPanel(panelId);
           this.persist();
           return;
         }
@@ -277,10 +294,12 @@ TX.components.Dock = {
           tree.collectPanels(root).concat(panelId),
           panelId,
         );
+        this.focusPanel(panelId);
         this.persist();
         return;
       }
       this.state.root = tree.insertAtRootEdge(this.state.root, panelId, "right");
+      this.focusPanel(panelId);
       this.persist();
     },
 
@@ -425,6 +444,7 @@ TX.components.Dock = {
           this.persist();
         } else {
           this.detach(panelId, event.clientX - host.left - 40, event.clientY - host.top - 12);
+          this.focusPanel(panelId);
         }
         return;
       }
@@ -434,6 +454,7 @@ TX.components.Dock = {
         dockIt((root, wasFloating) => (wasFloating
           ? tree.insertAtRootEdge(root, panelId, edge)
           : tree.insertAtRootEdge(tree.removePanel(root, panelId) || tree.tabs([]), panelId, edge)));
+        this.focusPanel(panelId);
         return;
       }
 
@@ -448,6 +469,7 @@ TX.components.Dock = {
             : tree.movePanel(root, panelId, drop.nodeId, "center");
           return tree.setActive(tree.reorderTab(inserted, panelId, drop.index), panelId);
         });
+        this.focusPanel(panelId);
         return;
       }
 
@@ -463,6 +485,7 @@ TX.components.Dock = {
             : tree.movePanel(root, panelId, drop.nodeId, drop.zone);
           return tree.setActive(next, panelId);
         });
+        this.focusPanel(panelId);
       }
     },
 
@@ -607,7 +630,7 @@ TX.components.Dock = {
                  }"
                  :data-dock-tab="panelId" v-tip="api.hint(panelId)"
                  @pointerdown.stop="api.startTabDrag(panelId, $event)"
-                 @click.stop="win.active = panelId">
+                 @click.stop="activateFloat(win, panelId)">
               <span>{{ api.title(panelId) }}</span>
               <span v-if="api.live(panelId)" class="tx-dock-tab-live" aria-hidden="true"></span>
             </div>

@@ -42,12 +42,17 @@ function createAtlasCanvas(container, hooks) {
   const store = TX.store;
   const state = store.state;
   let drag = null;
+  let pendingFit = null;
   const stage = TX.stage.createStage(container, {
     onViewChange: view => {
       syncDetail();
       if (hooks.onViewChange) hooks.onViewChange(view);
     },
     onPinchStart: () => { drag = null; marquee = null; },
+    onResize: () => {
+      if (!pendingFit || !atlasOnScreen()) return;
+      if (flushFit(pendingFit)) pendingFit = null;
+    },
   });
   const geometry = makeQuadGeometry();
   const meshes = new Map();
@@ -737,21 +742,36 @@ function createAtlasCanvas(container, hooks) {
   syncMeshes();
 
 
-  function fitAll() {
-    const bounds = unionBounds(state.textures.map(nodeBounds));
-    if (bounds) stage.fitTo(bounds);
-    else {
-      stage.view.zoom = 1;
-      stage.view.panX = 256;
-      stage.view.panY = 256;
-      stage.requestRender();
+  function flushFit(kind) {
+    if (kind === "selection") {
+      const bounds = unionBounds(store.selectedItems("texture").map(nodeBounds));
+      if (bounds) return !!stage.fitTo(bounds);
+      kind = "all";
     }
+    const bounds = unionBounds(state.textures.map(nodeBounds));
+    if (bounds) return !!stage.fitTo(bounds);
+    stage.view.zoom = 1;
+    stage.view.panX = 256;
+    stage.view.panY = 256;
+    stage.requestRender();
+    return true;
+  }
+
+  // Parked panels sit in a fixed 600×400 host — fit against that, then open the
+  // real tab, and the slice stays tiny. Wait until the atlas is on-screen.
+  function atlasOnScreen() {
+    if (container.closest(".tx-dock-parking")) return false;
+    return stage.view.width >= 64 && stage.view.height >= 64;
+  }
+
+  function fitAll() {
+    if (!atlasOnScreen() || !flushFit("all")) pendingFit = "all";
+    else pendingFit = null;
   }
 
   function fitSelection() {
-    const bounds = unionBounds(store.selectedItems("texture").map(nodeBounds));
-    if (bounds) stage.fitTo(bounds);
-    else fitAll();
+    if (!atlasOnScreen() || !flushFit("selection")) pendingFit = "selection";
+    else pendingFit = null;
   }
 
   function selectAll() {

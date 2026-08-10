@@ -541,11 +541,9 @@ TX.components.Properties = {
 
       await TX.progress.run(this.t("props.material.progress.generating"), async report => {
         await report(0, this.t("props.material.progress.reading", { name: node.name }));
-        const advice = TX.pbr.suggest(node.id, albedo, asset.version);
+        const advice = TX.material.applySuggestion(node.id);
         if (!advice) return;
 
-        TX.history.name("history.generate_pbr");
-        this.setMaterial(advice.settings);
         const r = advice.reading;
         this.generated = this.t("props.material.generated", {
           mean: Math.round(r.mean * 100),
@@ -553,8 +551,10 @@ TX.components.Properties = {
           highlights: Math.round(r.highlights * 100),
         });
 
-        const others = this.state.textures.filter(t => t.id !== node.id);
-        await TX.progress.each([node, ...others],
+        const list = advice.changed
+          ? this.state.textures.slice()
+          : [node];
+        await TX.progress.each(list,
           (texture, i, total) => this.t("props.material.progress.deriving", {
             name: texture.name, index: i + 1, total,
           }),

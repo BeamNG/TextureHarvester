@@ -133,11 +133,6 @@ TX.components.App = {
       return this.t(this.device.touch
         ? "source.empty.tutorial_touch" : "source.empty.tutorial");
     },
-    sourceTutorialEdge() {
-      void this.i18n.locale;
-      return this.t(this.device.touch
-        ? "source.empty.tutorial_edge_touch" : "source.empty.tutorial_edge");
-    },
     atlasTutorialDetail() {
       void this.i18n.locale;
       return this.t(this.device.touch
@@ -236,6 +231,17 @@ TX.components.App = {
     },
     onIntroStart() {
       this.pickFiles();
+    },
+    async onIntroExamples() {
+      try {
+        const files = await TX.progress.run(
+          this.t("intro.examples.progress"),
+          report => TX.examples.loadFiles(report),
+        );
+        await this.loadFiles(files);
+      } catch (err) {
+        this.notify(this.t("intro.examples.failed"), "error");
+      }
     },
 
     pickFiles() {
@@ -551,13 +557,34 @@ TX.components.App = {
       }
     },
 
-    revealProblem(entry) {
-      if (!entry || !entry.textureIds.length) return;
-      TX.store.select("texture", entry.textureIds.slice());
-      if (this.dockState) {
+    showAtlas() {
+      const dock = this.$refs.dock;
+      if (dock) dock.openPanel("atlas");
+      else if (this.dockState) {
         this.dockState.root = tree.setActive(this.dockState.root, "atlas");
         this.state.activePanel = "atlas";
+      } else {
+        this.state.activePanel = "atlas";
       }
+    },
+
+    revealProblem(entry) {
+      if (!entry) return;
+      if (entry.markIds && entry.markIds.length) {
+        TX.store.select("mark", entry.markIds.slice());
+        if (this.dockState) {
+          this.dockState.root = tree.setActive(this.dockState.root, "mark");
+          this.state.activePanel = "mark";
+        }
+        this.$nextTick(() => {
+          const id = entry.markIds[0];
+          if (id && this.mark) this.mark.revealMark(id);
+        });
+        return;
+      }
+      if (!entry.textureIds || !entry.textureIds.length) return;
+      TX.store.select("texture", entry.textureIds.slice());
+      this.showAtlas();
       this.$nextTick(() => {
         if (this.atlas) this.atlas.fitSelection();
       });
@@ -746,6 +773,11 @@ TX.components.App = {
       mark: this.mark,
       atlas: this.atlas,
       notify: (text, color) => this.notify(text, color),
+      onFirstExtract: () => {
+        this.$nextTick(() => {
+          if (this.atlas) this.atlas.fitSelection();
+        });
+      },
     }));
 
     this.propertiesHost = propertiesHost;
@@ -861,7 +893,6 @@ TX.components.App = {
           <span class="tx-source-tip-emoji" aria-hidden="true">💡</span>
           <div class="tx-source-tip-body">
             <p class="tx-source-tip-lead">{{ sourceTutorialLead }}</p>
-            <p>{{ sourceTutorialEdge }}</p>
           </div>
         </div>
       </Teleport>
@@ -894,7 +925,7 @@ TX.components.App = {
 
       <ContextMenu v-model="menu.open" :position="menu.position" :items="menu.items" />
       <ShortcutsDialog v-model="helpOpen" />
-      <Intro v-model="introOpen" @start="onIntroStart" />
+      <Intro v-model="introOpen" @start="onIntroStart" @examples="onIntroExamples" />
 
       <v-snackbar v-model="notice.open" :color="notice.color" timeout="2600" location="bottom right">
         {{ notice.text }}

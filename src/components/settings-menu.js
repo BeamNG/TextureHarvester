@@ -186,6 +186,15 @@ TX.components.SettingsMenu = {
 
           <v-divider class="my-2" />
 
+          <div class="tx-settings-section">{{ t('settings.section.material') }}</div>
+          <v-switch v-model="settings.autoPbr" :label="t('settings.auto_pbr')"
+                    density="compact" hide-details color="primary"
+                    class="tx-props-switch"
+                    v-tip="t('settings.auto_pbr.tip')" />
+          <p class="tx-props-note">{{ t('settings.auto_pbr.note') }}</p>
+
+          <v-divider class="my-2" />
+
           <div class="tx-settings-section">{{ t('settings.section.ai') }}</div>
           <v-switch :model-value="settings.ai" @update:model-value="setAi($event)"
                     :label="t('settings.ai')"

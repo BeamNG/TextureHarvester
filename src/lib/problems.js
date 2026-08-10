@@ -63,6 +63,22 @@ function structural(state) {
       { textureIds: orphans.map(o => o.id) }));
   }
 
+  for (const mark of state.marks) {
+    if (!mark.points || mark.points.length !== 4) continue;
+    const usable = TX.geom.squareToQuad(mark.points);
+    const pinched = TX.geom.pinchedCorners(mark.points);
+    if (usable && !pinched.length) continue;
+    const textureIds = textures.filter(tex => tex.markId === mark.id).map(tex => tex.id);
+    found.push(problem("warning", `pinch:${mark.id}`,
+      t(pinched.length
+        ? "problems.pinch.title"
+        : "problems.pinch.title_flat"),
+      t(pinched.length
+        ? "problems.pinch.detail"
+        : "problems.pinch.detail_flat"),
+      { markIds: [mark.id], textureIds }));
+  }
+
   return found;
 }
 

@@ -7,7 +7,7 @@ const MAX_REPROJECTION = 4096;
 function create(deps) {
   const store = TX.store;
   const state = store.state;
-  const { mark, atlas, notify } = deps;
+  const { mark, atlas, notify, onFirstExtract } = deps;
 
   function snappedScale(size) {
     if (!state.settings.snapToGrid) return 1;
@@ -110,8 +110,9 @@ function create(deps) {
 
     atlas.syncMeshes();
     if (done && firstOnSheet) {
-      atlas.fitAll();
       if (state.textures.length) store.select("texture", state.textures[0].id);
+      if (typeof onFirstExtract === "function") onFirstExtract();
+      else atlas.fitAll();
     }
 
     if (failed) {
@@ -148,7 +149,7 @@ function create(deps) {
     }
     if (!canvas) return false;
 
-    store.setTextureCanvas(existing.id, canvas);
+    store.setTextureCanvas(existing.id, canvas, { quiet: !!opts.draft });
     if (!opts.draft) {
       const scaledWidth = existing.width * existing.scaleX;
       const scaledHeight = existing.height * existing.scaleY;

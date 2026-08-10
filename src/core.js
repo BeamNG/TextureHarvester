@@ -22,6 +22,7 @@ import "./lib/dock-tree.js";
 import "./lib/display.js";
 import "./lib/snap.js";
 import "./lib/progress.js";
+import "./lib/examples.js";
 import "./lib/i18n.js";
 import "./state.js";
 import "./lib/problems.js";

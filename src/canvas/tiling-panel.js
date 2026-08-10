@@ -214,7 +214,10 @@ function createTilingPanel(container, hooks) {
     () => {
       const node = selectedTexture();
       const options = view();
-      const source = node ? `${node.id}:${store.textureKey(node.id)}` : "none";
+      // pixelEpoch — texture pixels live in a Map outside Vue's graph
+      const source = node
+        ? `${node.id}:${store.textureKey(node.id)}:${state.pixelEpoch}`
+        : `none:${state.pixelEpoch}`;
       return `${source}|${options.cols}x${options.rows}|${options.wrap}|${options.showSeams}`;
     },
     (next, previous) => {

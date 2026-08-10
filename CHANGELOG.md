@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.6.0] — 2026-08-10
+
+### Added
+- Auto-generate PBR maps after extract (Settings → Material); first run suggests strengths
+- Intro can load the bundled example photos
+- Meeting edges finish a mark as a parallelogram; pinched or stacked corners show a warning
+- First extract selects the new atlas slice and fits it once Atlas is actually on screen
+
+### Changed
+- Touch tips and status hints say long-press and drag (long-press alone only opens the loupe)
+- Stronger Props group headers; warning chip no longer reserves empty icon space
+
+### Fixed
+- Dragging a mark edge/corner no longer rebuilds PBR every frame (was very slow with maps on)
+- Tiles and 3D refresh when mark pixels change
+- Status bar follows the active dock tab without clicking the panel body
+- Atlas fit no longer measures the off-screen parking host (first slice looked tiny)
+
 ## [0.5.0] — 2026-08-10
 
 ### Added

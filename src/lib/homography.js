@@ -320,6 +320,22 @@ function quadDimensions(quad) {
   };
 }
 
+// Corners closer than this share of the mark's span read as one handle.
+const PINCH_RATIO = 0.05;
+
+function pinchedCorners(points, ratio) {
+  if (!points || points.length !== 4) return [];
+  const span = Math.max(quadDimensions(points).width, quadDimensions(points).height, 1);
+  const min = span * (typeof ratio === "number" ? ratio : PINCH_RATIO);
+  const pairs = [];
+  for (let i = 0; i < 4; i++) {
+    for (let j = i + 1; j < 4; j++) {
+      if (dist(points[i], points[j]) < min) pairs.push([i, j]);
+    }
+  }
+  return pairs;
+}
+
 function orderQuad(points) {
   if (points.length !== 4) return null;
 
@@ -363,6 +379,8 @@ TX.geom = {
   invert3,
   quadDimensions,
   orderQuad,
+  pinchedCorners,
+  PINCH_RATIO,
   pointInQuad,
   dist,
   UNIT_CORNERS,

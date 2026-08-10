@@ -841,6 +841,11 @@ function runDomainChecks(quad) {
   check("ordering three collinear clicks still yields four points that the warp refuses",
     geom.orderQuad(q([[0, 0], [10, 10], [20, 20], [0, 40]])).length === 4
     && geom.squareToQuad(geom.orderQuad(q([[0, 0], [10, 10], [20, 20], [0, 40]]))) === null);
+  check("corners stacked on each other are reported as pinched",
+    geom.pinchedCorners(q([[0, 0], [100, 0], [100, 0.5], [0, 100]])).length === 1,
+    JSON.stringify(geom.pinchedCorners(q([[0, 0], [100, 0], [100, 0.5], [0, 100]]))));
+  check("a tidy rectangle is not pinched",
+    geom.pinchedCorners(q([[0, 0], [100, 0], [100, 80], [0, 80]])).length === 0);
 }
 
 // ---- the shader and the maths have to agree ------------------------------

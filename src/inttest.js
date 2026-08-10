@@ -59,6 +59,8 @@ const near = (got, want, tol) => Math.abs(got[0] - want[0]) <= tol
 async function run() {
   const store = TX.store;
   const state = store.state;
+  state.settings.autoPbr = false;
+  TX.material.cancelAuto();
 
   const notices = [];
   const mark = TX.markCanvas.createMarkCanvas(host(), {});

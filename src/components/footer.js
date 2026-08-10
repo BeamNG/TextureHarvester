@@ -23,7 +23,7 @@ function markHints(stats) {
   const touch = TX.device.touch;
   const placeKey = touch ? "status.hint.keys.long_press" : "status.hint.keys.ctrl_click";
   const placeNext = touch ? "status.hint.keys.tap" : "status.hint.keys.ctrl_click";
-  const edgeKey = touch ? "status.hint.keys.long_press" : "status.hint.keys.ctrl_drag";
+  const edgeKey = touch ? "status.hint.keys.long_press_drag" : "status.hint.keys.ctrl_drag";
   if (!stats.images) {
     if (touch) {
       return [hint(TX.t("status.hint.keys.drop"), TX.t("status.hint.mark.drop"))];
@@ -88,7 +88,7 @@ function atlasHints(stats) {
   const touch = TX.device.touch;
   if (!stats.textures) {
     return [hint(
-      TX.t(touch ? "status.hint.keys.long_press" : "status.hint.keys.ctrl_click"),
+      TX.t(touch ? "status.hint.keys.long_press_drag" : "status.hint.keys.ctrl_click"),
       TX.t("status.hint.atlas.mark_in_source"),
     )];
   }
@@ -222,7 +222,9 @@ TX.components.StatusBar = {
   },
   methods: {
     reveal(entry) {
-      if (!entry.textureIds.length) return;
+      if (!entry) return;
+      if (!(entry.textureIds && entry.textureIds.length)
+        && !(entry.markIds && entry.markIds.length)) return;
       this.problemsOpen = false;
       this.$emit("reveal", entry);
     },
@@ -368,8 +370,9 @@ TX.components.StatusBar = {
           </p>
           <button v-for="p in problems" :key="p.key" type="button" class="tx-problem"
                   :class="'tx-problem--' + p.severity"
-                  v-tip="p.textureIds.length ? t('status.problems.reveal.tip')
-                                             : t('status.problems.reveal.tip_none')"
+                  v-tip="(p.textureIds && p.textureIds.length) || (p.markIds && p.markIds.length)
+                           ? t('status.problems.reveal.tip')
+                           : t('status.problems.reveal.tip_none')"
                   @click="reveal(p)">
             <v-icon :icon="icons.warning" size="14" />
             <span>

@@ -96,6 +96,9 @@ async function run() {
     TX.intro.saveSeen();
     await settle();
   }
+  // Auto-PBR is on by default; tests drive Generate PBR themselves.
+  store.state.settings.autoPbr = false;
+  TX.material.cancelAuto();
   const dock = TX.dockTree;
 
   // ---- default layout ----------------------------------------------------
@@ -482,12 +485,20 @@ async function runLocalSpaceChecks(app) {
   await settle();
   check("two lines complete a mark", state.marks.length === 1 && !state.pending.points.length,
     `marks=${state.marks.length} pending=${state.pending.points.length}`);
-  if (!state.marks.length) return;
+  await settle();
 
   {
     const first = store.soleSelected("texture");
     check("the first extraction selects the slice it made",
       !!first && first.markId === state.marks[0].id, first ? first.name : "nothing selected");
+    const framedAtlas = { ...app.atlas.stage.view };
+    app.atlas.fitSelection();
+    const atlasView = app.atlas.stage.view;
+    check("and fits the new slice in the atlas",
+      atlasView.zoom === framedAtlas.zoom
+      && atlasView.panX === framedAtlas.panX
+      && atlasView.panY === framedAtlas.panY,
+      `zoom ${framedAtlas.zoom.toFixed(3)} -> ${atlasView.zoom.toFixed(3)}`);
     const framed = { ...app.tilingPanel.stage.view };
     app.tilingPanel.fit();
     const view = app.tilingPanel.stage.view;
@@ -495,6 +506,32 @@ async function runLocalSpaceChecks(app) {
       view.zoom === framed.zoom && view.panX === framed.panX && view.panY === framed.panY,
       `zoom ${framed.zoom.toFixed(3)} -> ${view.zoom.toFixed(3)}`);
   }
+
+  // Adjacent edges that meet should invent the fourth corner.
+  store.clearPending();
+  const beforeMarks = state.marks.length;
+  overlay.dispatchEvent(ctrl("pointerdown", at(20, 20)));
+  overlay.dispatchEvent(ctrl("pointermove", at(120, 20)));
+  overlay.dispatchEvent(ctrl("pointerup", at(120, 20)));
+  await settle();
+  overlay.dispatchEvent(ctrl("pointerdown", at(120, 22)));
+  overlay.dispatchEvent(ctrl("pointermove", at(120, 100)));
+  overlay.dispatchEvent(ctrl("pointerup", at(120, 100)));
+  await settle();
+  check("two meeting edges also complete a mark",
+    state.marks.length === beforeMarks + 1 && !state.pending.points.length,
+    `marks=${state.marks.length - beforeMarks} pending=${state.pending.points.length}`);
+  if (state.marks.length > beforeMarks) {
+    const made = state.marks[state.marks.length - 1];
+    check("and the invented corner is opposite the shared one",
+      TX.geom.pinchedCorners(made.points).length === 0
+      && !!TX.geom.squareToQuad(made.points),
+      JSON.stringify(made.points));
+    store.removeMark(made.id);
+    await settle();
+  }
+
+  if (!state.marks.length) return;
 
   const mark = state.marks[0];
   check("the mark starts with default local space",
@@ -2561,6 +2598,18 @@ async function runStatusBarChecks(app, texture) {
   check("the mark panel offers marking instead",
     hints().some(h => /place a corner/i.test(h)), hints().join(" | "));
 
+  const tilingTab = tabOf("tiling");
+  if (tilingTab) {
+    const at = centreOf(tilingTab);
+    tilingTab.dispatchEvent(pointer("pointerdown", at.x, at.y));
+    window.dispatchEvent(pointer("pointerup", at.x, at.y));
+    await settle();
+    check("picking a tab updates the active panel without clicking the body",
+      state.activePanel === "tiling", state.activePanel);
+    check("and the status bar follows that tab",
+      hints().some(h => /preview it/i.test(h)), hints().join(" | "));
+  }
+
   store.select("texture", texture.id);
   state.activePanel = "preview3d";
   await settle();
@@ -2595,7 +2644,7 @@ async function runStatusBarChecks(app, texture) {
     if (menu) {
       const labels = [...menu.querySelectorAll(".tx-settings-section")].map(el => el.textContent);
       check("it groups them by what they affect",
-        labels.join(",") === "Panels,Language,Grid,Marking,Extraction,Packing,Export,AI,Help",
+        labels.join(",") === "Panels,Language,Grid,Marking,Extraction,Packing,Export,Material,AI,Help",
         labels.join(","));
       const grid = menu.querySelector("input[type=number]");
       grid.value = "32";

@@ -23,6 +23,7 @@ const defaultSettings = () => ({
   padding: 2,
   powerOfTwo: false,
   exportMaps: false,
+  autoPbr: true,
   preview: { cols: 3, rows: 3, wrap: "repeat", showSeams: true },
   views: { mode: "off", overlay: 0.8, numbers: true },
   sway: true,
@@ -56,6 +57,29 @@ const state = reactive({
   depthError: null,
   sceneStats: null,
 });
+
+// Skip auto-PBR while restoring undo/session so saved material sticks.
+let hushAutoPbr = 0;
+
+function withoutAutoPbr(work) {
+  hushAutoPbr++;
+  TX.material.cancelAuto();
+  try {
+    return work();
+  } finally {
+    hushAutoPbr--;
+  }
+}
+
+async function withoutAutoPbrAsync(work) {
+  hushAutoPbr++;
+  TX.material.cancelAuto();
+  try {
+    return await work();
+  } finally {
+    hushAutoPbr--;
+  }
+}
 
 const cameraOf = camera => {
   if (!camera) return null;
@@ -296,13 +320,19 @@ function addTexture(entry) {
   return texture;
 }
 
-function setTextureCanvas(id, canvas) {
+function setTextureCanvas(id, canvas, options) {
+  const quiet = !!(options && options.quiet);
   const previous = assets.textures.get(id);
   assets.textures.set(id, { canvas, version: (previous ? previous.version : 0) + 1 });
   TX.tiling.invalidate(id);
   TX.delight.invalidate(id);
   TX.flip.invalidate(id);
+  // Draft drags update the atlas imperatively; skip epoch/material so Props/3D
+  // do not rebuild PBR maps on every pointer move.
+  if (quiet) return;
+  TX.material.invalidate(id);
   state.pixelEpoch++;
+  if (!hushAutoPbr) TX.material.scheduleAuto(id);
 }
 
 // Delight before tiling; flip last so welded seam matches feathered edge.
@@ -559,61 +589,63 @@ async function snapshot() {
 const decodeBlob = blob => TX.io.decodeBlob(blob);
 
 async function restore(saved) {
-  if (!saved || saved.version !== TX.schema.document) return false;
+  return withoutAutoPbrAsync(async () => {
+    if (!saved || saved.version !== TX.schema.document) return false;
 
-  reset();
-  resetSettings();
-  applySettings(saved.settings);
+    reset();
+    resetSettings();
+    applySettings(saved.settings);
 
-  for (const image of saved.images || []) {
-    if (!image || !image.id || !(image.file instanceof Blob)) continue;
-    try {
-      const element = await decodeBlob(image.file);
-      assets.sources.set(image.id, { element, source: TX.warp.createSource(element) });
-      const { depth, ...rest } = image;
-      setImageDepth(image.id, await depthFromRecord(depth));
-      state.images.push({
-        ...rest,
-        ...transformOf(image),
-        width: numberOr(image.width, element.naturalWidth),
-        height: numberOr(image.height, element.naturalHeight),
-      });
-    } catch (err) {
+    for (const image of saved.images || []) {
+      if (!image || !image.id || !(image.file instanceof Blob)) continue;
+      try {
+        const element = await decodeBlob(image.file);
+        assets.sources.set(image.id, { element, source: TX.warp.createSource(element) });
+        const { depth, ...rest } = image;
+        setImageDepth(image.id, await depthFromRecord(depth));
+        state.images.push({
+          ...rest,
+          ...transformOf(image),
+          width: numberOr(image.width, element.naturalWidth),
+          height: numberOr(image.height, element.naturalHeight),
+        });
+      } catch (err) {
+      }
     }
-  }
 
-  const liveImages = new Set(state.images.map(i => i.id));
-  for (const mark of saved.marks || []) {
-    if (!mark || !mark.id || !liveImages.has(mark.imageId)) continue;
-    const points = pointsOf(mark.points);
-    if (points.length !== 4) continue;
-    state.marks.push({ ...plainMark(mark), points });
-  }
-
-  for (const texture of saved.textures || []) {
-    if (!texture || !texture.id || !(texture.blob instanceof Blob)) continue;
-    try {
-      const element = await decodeBlob(texture.blob);
-      const canvas = document.createElement("canvas");
-      canvas.width = element.naturalWidth;
-      canvas.height = element.naturalHeight;
-      canvas.getContext("2d").drawImage(element, 0, 0);
-      const { blob, ...rest } = texture;
-      setTextureCanvas(texture.id, canvas);
-      state.textures.push({
-        ...rest,
-        ...transformOf(rest),
-        markId: rest.markId || null,
-        width: canvas.width,
-        height: canvas.height,
-        tiling: { ...TX.tiling.defaults(), ...rest.tiling },
-        delight: TX.delight.settingsOf(rest.delight),
-      });
-    } catch (err) {
+    const liveImages = new Set(state.images.map(i => i.id));
+    for (const mark of saved.marks || []) {
+      if (!mark || !mark.id || !liveImages.has(mark.imageId)) continue;
+      const points = pointsOf(mark.points);
+      if (points.length !== 4) continue;
+      state.marks.push({ ...plainMark(mark), points });
     }
-  }
 
-  return true;
+    for (const texture of saved.textures || []) {
+      if (!texture || !texture.id || !(texture.blob instanceof Blob)) continue;
+      try {
+        const element = await decodeBlob(texture.blob);
+        const canvas = document.createElement("canvas");
+        canvas.width = element.naturalWidth;
+        canvas.height = element.naturalHeight;
+        canvas.getContext("2d").drawImage(element, 0, 0);
+        const { blob, ...rest } = texture;
+        setTextureCanvas(texture.id, canvas);
+        state.textures.push({
+          ...rest,
+          ...transformOf(rest),
+          markId: rest.markId || null,
+          width: canvas.width,
+          height: canvas.height,
+          tiling: { ...TX.tiling.defaults(), ...rest.tiling },
+          delight: TX.delight.settingsOf(rest.delight),
+        });
+      } catch (err) {
+      }
+    }
+
+    return true;
+  });
 }
 
 // Key predates the Texture Harvester rename; changing it would drop the view record.
@@ -801,9 +833,10 @@ function documentSnapshot() {
 }
 
 function applyDocumentSnapshot(snap) {
-  if (!snap || typeof snap !== "object") return false;
+  return withoutAutoPbr(() => {
+    if (!snap || typeof snap !== "object") return false;
 
-  applySettings(snap.settings);
+    applySettings(snap.settings);
 
   const wantImages = new Map(snap.images.map(i => [i.id, i]));
   const wantMarks = new Map(snap.marks.map(m => [m.id, m]));
@@ -902,6 +935,7 @@ function applyDocumentSnapshot(snap) {
   }
 
   return true;
+  });
 }
 
 let saveTimer = null;

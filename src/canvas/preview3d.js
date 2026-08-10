@@ -393,7 +393,10 @@ function createPreview3d(container) {
   stopWatch = watch(
     () => {
       const node = selected();
-      const pixels = node ? `${node.id}:${store.textureKey(node.id)}` : "none";
+      // pixelEpoch — texture pixels live in a Map outside Vue's graph
+      const pixels = node
+        ? `${node.id}:${store.textureKey(node.id)}:${state.pixelEpoch}`
+        : `none:${state.pixelEpoch}`;
       const placed = node ? String(node.rotation) : "none";
       const material = JSON.stringify(TX.material.settingsOf(state.settings.material));
       const image = node ? null : selectedImage();

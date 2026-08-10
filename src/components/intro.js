@@ -21,7 +21,7 @@ TX.components.Intro = {
   props: {
     modelValue: { type: Boolean, default: false },
   },
-  emits: ["update:modelValue", "start"],
+  emits: ["update:modelValue", "start", "examples"],
   setup() {
     return {
       version: TX.version,
@@ -39,8 +39,7 @@ TX.components.Intro = {
       const compact = this.device.compact;
       const markKeys = touch
         ? [
-          { kind: "kbd", label: this.t("status.hint.keys.long_press") },
-          { kind: "kbd", label: this.t("status.hint.keys.tap") },
+          { kind: "kbd", label: this.t("status.hint.keys.long_press_drag") },
         ]
         : [
           { kind: "kbd", label: this.t("status.hint.keys.ctrl_click") },
@@ -117,6 +116,11 @@ TX.components.Intro = {
       this.$emit("update:modelValue", false);
       if (start) this.$emit("start");
     },
+    startExamples() {
+      saveSeen();
+      this.$emit("update:modelValue", false);
+      this.$emit("examples");
+    },
   },
   template: `
     <div v-if="modelValue" class="tx-intro" role="dialog" aria-modal="true"
@@ -158,6 +162,10 @@ TX.components.Intro = {
           <v-btn variant="flat" color="primary" class="tx-action"
                  :prepend-icon="icons.load" @click="close(true)">
             {{ t('intro.start') }}
+          </v-btn>
+          <v-btn variant="tonal" color="primary" class="tx-action"
+                 :prepend-icon="icons.layers" @click="startExamples">
+            {{ t('intro.examples') }}
           </v-btn>
         </div>
       </div>

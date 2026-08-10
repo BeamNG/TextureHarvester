@@ -1,8 +1,12 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, createReadStream, existsSync, cpSync } from "node:fs";
+import { join, normalize, sep, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import { viteSingleFile } from "vite-plugin-singlefile";
 
-const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
+const root = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+const examplesDir = join(root, "examples");
 
 const BUNDLED = [
   ["vue", "node_modules/vue/LICENSE"],
@@ -14,7 +18,7 @@ const BUNDLED = [
 function licenseBanner() {
   const notices = BUNDLED.map(([name, path]) => {
     const version = pkg.dependencies[name].replace(/^[^\d]*/, "");
-    const text = readFileSync(new URL(path, import.meta.url), "utf8").trim();
+    const text = readFileSync(join(root, path), "utf8").trim();
     return `${name} ${version}\n${"-".repeat(60)}\n${text}`;
   });
 
@@ -26,7 +30,7 @@ function licenseBanner() {
     "Released under the MIT licence. The full text, and the notices for everything",
     "bundled into this file, follow.",
     "",
-    readFileSync(new URL("./LICENSE", import.meta.url), "utf8").trim(),
+    readFileSync(join(root, "LICENSE"), "utf8").trim(),
     "",
     "",
     "Bundled third-party software",
@@ -45,8 +49,30 @@ const licenseNotice = () => ({
   },
 });
 
+// Example photos stay outside the single HTML; serve them in dev and copy into dist/.
+function examplesStatic() {
+  return {
+    name: "tx-examples",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (!req.url || !req.url.startsWith("/examples/")) return next();
+        const rel = decodeURIComponent(req.url.slice("/examples/".length).split("?")[0]);
+        if (!rel || rel.includes("..") || rel.includes("/") || rel.includes("\\")) return next();
+        const file = normalize(join(examplesDir, rel));
+        if (!file.startsWith(examplesDir + sep) || !existsSync(file)) return next();
+        res.setHeader("Content-Type", "image/jpeg");
+        createReadStream(file).pipe(res);
+      });
+    },
+    writeBundle(output) {
+      if (!existsSync(examplesDir)) return;
+      cpSync(examplesDir, join(output.dir || join(root, "dist"), "examples"), { recursive: true });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [viteSingleFile(), licenseNotice()],
+  plugins: [viteSingleFile(), licenseNotice(), examplesStatic()],
   server: { port: 5173 },
   resolve: {
     alias: {

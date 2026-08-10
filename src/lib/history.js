@@ -51,6 +51,7 @@ const SETTING_NAMES = {
   padding: "history.setting.padding",
   powerOfTwo: "history.setting.powerOfTwo",
   exportMaps: "history.setting.exportMaps",
+  autoPbr: "history.setting.autoPbr",
   ai: "history.setting.ai",
   material: "history.setting.material",
 };

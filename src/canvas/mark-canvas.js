@@ -44,6 +44,7 @@ const COLORS = {
   localGrid: "rgba(255,255,255,0.28)",
   point: "#ffffff",
   pointOutside: "#ef5350",
+  pointPinched: "#ff1744",
   pointStroke: "#222222",
   pivot: "#ffd54f",
   pivotBent: "#ffa000",
@@ -200,6 +201,24 @@ function createMarkCanvas(container, hooks) {
       ctx.lineWidth = 2;
       ctx.strokeStyle = COLORS.markDirty;
       ctx.stroke();
+      for (let i = 0; i < corners.length; i++) {
+        const p = corners[i];
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, POINT_RADIUS + 7, 0, Math.PI * 2);
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = COLORS.pointPinched;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, POINT_RADIUS + 1, 0, Math.PI * 2);
+        ctx.fillStyle = COLORS.pointPinched;
+        ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 11px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("!", p.x, p.y + 0.5);
+        ctx.textAlign = "start";
+      }
       return;
     }
 
@@ -263,18 +282,45 @@ function createMarkCanvas(container, hooks) {
 
     if (mark.id === hoveredMarkId || selected) paintLocalGrid(ctx, mark, geo);
 
+    const pinched = new Set();
+    for (const pair of TX.geom.pinchedCorners(mark.points)) {
+      pinched.add(pair[0]);
+      pinched.add(pair[1]);
+    }
+
     for (let i = 0; i < corners.length; i++) {
       const p = corners[i];
       const local = mark.points[i];
       const oob = local.x < 0 || local.y < 0
         || local.x > image.width || local.y > image.height;
+      const clash = pinched.has(i);
+      if (clash) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, POINT_RADIUS + 7, 0, Math.PI * 2);
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = COLORS.pointPinched;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, POINT_RADIUS + 3, 0, Math.PI * 2);
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = "rgba(255,255,255,0.9)";
+        ctx.stroke();
+      }
       ctx.beginPath();
-      ctx.arc(p.x, p.y, POINT_RADIUS, 0, Math.PI * 2);
-      ctx.fillStyle = oob ? COLORS.pointOutside : COLORS.point;
+      ctx.arc(p.x, p.y, POINT_RADIUS + (clash ? 1 : 0), 0, Math.PI * 2);
+      ctx.fillStyle = clash ? COLORS.pointPinched : (oob ? COLORS.pointOutside : COLORS.point);
       ctx.fill();
       ctx.lineWidth = 1.5;
-      ctx.strokeStyle = COLORS.pointStroke;
+      ctx.strokeStyle = clash ? "#fff" : COLORS.pointStroke;
       ctx.stroke();
+      if (clash) {
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 11px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("!", p.x, p.y + 0.5);
+        ctx.textAlign = "start";
+      }
     }
 
     if (mark.id === hoveredMarkId || selected || bent) paintHandles(ctx, geo, corners);
@@ -658,12 +704,33 @@ function createMarkCanvas(container, hooks) {
     return null;
   }
 
+  function weldRadiusOf() {
+    const set = state.settings.weldRadius;
+    const base = typeof set === "number" && set > 0 ? set : 0;
+    if (!base) return 0;
+    return touchUi() ? Math.max(base, grabPoint()) : base;
+  }
+
   function weldCandidate(image, screen, exclude) {
-    const radius = state.settings.weldRadius;
+    const radius = weldRadiusOf();
     if (!(radius > 0)) return null;
 
     let best = null;
     let bestDistance = radius;
+
+    if (state.pending.imageId === image.id) {
+      state.pending.points.forEach((point, index) => {
+        if (exclude && exclude.pendingIndex === index) return;
+        const world = localToWorld(image, point);
+        const at = stage.worldToScreen(world.x, world.y);
+        const distance = Math.hypot(at.x - screen.x, at.y - screen.y);
+        if (distance <= bestDistance) {
+          bestDistance = distance;
+          best = { point: { ...point }, screen: at, pendingIndex: index };
+        }
+      });
+    }
+
     for (const mark of store.marksOfImage(image.id)) {
       for (let i = 0; i < mark.points.length; i++) {
         if (exclude && exclude.markId === mark.id && exclude.index === i) continue;
@@ -672,13 +739,108 @@ function createMarkCanvas(container, hooks) {
         const distance = Math.hypot(at.x - screen.x, at.y - screen.y);
         if (distance <= bestDistance) {
           bestDistance = distance;
-          best = { point: { ...mark.points[i] }, screen: at };
+          best = { point: { ...mark.points[i] }, screen: at, pendingIndex: -1 };
         }
       }
     }
     return best;
   }
 
+  function placeAt(image, screen) {
+    const world = stage.screenToWorld(screen.x, screen.y);
+    const local = worldToLocal(image, world);
+    const weld = weldCandidate(image, screen, null);
+    if (weld) {
+      return {
+        point: weld.point,
+        pendingIndex: typeof weld.pendingIndex === "number" ? weld.pendingIndex : -1,
+        screen: weld.screen,
+      };
+    }
+    return { point: { x: local.x, y: local.y }, pendingIndex: -1, screen };
+  }
+
+  function finishPending(image) {
+    const merged = [];
+    const radius = Math.max(weldRadiusOf(), 6);
+    for (const point of state.pending.points) {
+      const world = localToWorld(image, point);
+      const at = stage.worldToScreen(world.x, world.y);
+      const hit = merged.find(entry => Math.hypot(entry.at.x - at.x, entry.at.y - at.y) <= radius);
+      if (!hit) merged.push({ point, at });
+    }
+    const points = merged.map(entry => entry.point);
+    if (points.length < 4) {
+      state.pending.points = points;
+      stage.requestRender();
+      return;
+    }
+
+    const ordered = TX.geom.orderQuad(points.slice(0, 4));
+    store.clearPending();
+    if (ordered && TX.geom.squareToQuad(ordered)
+      && !TX.geom.pinchedCorners(ordered).length) {
+      const mark = store.addMark(image.id, ordered);
+      if (hooks && hooks.onMarkCreated) hooks.onMarkCreated(mark.id);
+    } else if (hooks && hooks.onNotice) {
+      hooks.onNotice(TX.t("mark.notice.bad_quad"), "warning");
+    }
+    stage.requestRender();
+  }
+
+  function commitLine(image, fromScreen, toScreen) {
+    if (state.pending.imageId !== image.id) {
+      state.pending.imageId = image.id;
+      state.pending.points = [];
+    }
+
+    const from = placeAt(image, fromScreen);
+    const to = placeAt(image, toScreen);
+    const sharedFrom = from.pendingIndex >= 0;
+    const sharedTo = to.pendingIndex >= 0;
+
+    if (!sharedFrom) state.pending.points.push(from.point);
+    if (!sharedTo) {
+      const again = placeAt(image, toScreen);
+      if (again.pendingIndex < 0) state.pending.points.push(again.point);
+    }
+
+    // Adjacent edges share one corner → invent the fourth as a parallelogram.
+    if (state.pending.points.length === 3 && sharedFrom !== sharedTo) {
+      const sharedIdx = sharedFrom ? from.pendingIndex : to.pendingIndex;
+      const shared = state.pending.points[sharedIdx];
+      const neu = sharedFrom ? to.point : from.point;
+      const other = state.pending.points.find((p, i) => i !== sharedIdx);
+      if (shared && other && neu) {
+        state.pending.points.push({
+          x: other.x + neu.x - shared.x,
+          y: other.y + neu.y - shared.y,
+        });
+      }
+    }
+
+    if (state.pending.points.length >= 4) finishPending(image);
+    else stage.requestRender();
+  }
+
+  function addPendingPoint(image, world, screen) {
+    const placed = screen
+      ? placeAt(image, screen)
+      : { point: worldToLocal(image, world), pendingIndex: -1 };
+
+    if (state.pending.imageId !== image.id) {
+      state.pending.imageId = image.id;
+      state.pending.points = [];
+    }
+    if (placed.pendingIndex >= 0) {
+      stage.requestRender();
+      return;
+    }
+    state.pending.points.push(placed.point);
+
+    if (state.pending.points.length >= 4) finishPending(image);
+    else stage.requestRender();
+  }
 
   let marquee = null;
   let marking = null;
@@ -727,30 +889,6 @@ function createMarkCanvas(container, hooks) {
     if (drag && (drag.type === "point" || drag.type === "pivot")) return drag;
     if (drag && drag.type !== "line") return null;
     return marking;
-  }
-
-  function addPendingPoint(image, world, screen) {
-    const local = worldToLocal(image, world);
-    const weld = screen ? weldCandidate(image, screen, null) : null;
-    const point = weld ? weld.point : { x: local.x, y: local.y };
-
-    if (state.pending.imageId !== image.id) {
-      state.pending.imageId = image.id;
-      state.pending.points = [];
-    }
-    state.pending.points.push(point);
-
-    if (state.pending.points.length === 4) {
-      const ordered = TX.geom.orderQuad(state.pending.points);
-      store.clearPending();
-      if (ordered) {
-        const mark = store.addMark(image.id, ordered);
-        if (hooks && hooks.onMarkCreated) hooks.onMarkCreated(mark.id);
-      } else if (hooks && hooks.onNotice) {
-        hooks.onNotice(TX.t("mark.notice.bad_quad"), "warning");
-      }
-    }
-    stage.requestRender();
   }
 
   function onPointerDown(event) {
@@ -978,6 +1116,9 @@ function createMarkCanvas(container, hooks) {
       if (Math.hypot(screen.x - drag.from.x, screen.y - drag.from.y) > LINE_DRAG_MIN) {
         drag.moved = true;
       }
+      const image = store.findImage(drag.imageId);
+      const hit = image ? weldCandidate(image, screen, null) : null;
+      weldTarget = hit ? hit.screen : null;
       stage.requestRender();
       return;
     }
@@ -1089,12 +1230,10 @@ function createMarkCanvas(container, hooks) {
     if (drag && drag.type === "line") {
       const image = store.findImage(drag.imageId);
       if (image) {
-        const toWorld = s => stage.screenToWorld(s.x, s.y);
         if (drag.moved) {
-          addPendingPoint(image, toWorld(drag.from), drag.from);
-          addPendingPoint(image, toWorld(drag.to), drag.to);
+          commitLine(image, drag.from, drag.to);
         } else {
-          addPendingPoint(image, toWorld(drag.from), drag.from);
+          addPendingPoint(image, stage.screenToWorld(drag.from.x, drag.from.y), drag.from);
         }
       }
     }
