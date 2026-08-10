@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.1] — 2026-08-10
+
+### Fixed
+- Settings header shows a Done button (the close icon was missing from the icon set)
+- Settings opens with no transition animation
+
 ## [0.4.0] — 2026-08-10
 
 ### Changed

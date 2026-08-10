@@ -1124,6 +1124,10 @@ body.tx-dock-resizing {
   font-weight: 600;
 }
 
+.tx-settings-close {
+  flex: 0 0 auto;
+}
+
 .tx-settings-menu {
   flex: 1 1 auto;
   min-height: 0;

@@ -69,7 +69,7 @@ TX.components.SettingsMenu = {
     },
   },
   template: `
-    <v-dialog v-model="open" fullscreen transition="dialog-bottom-transition"
+    <v-dialog v-model="open" fullscreen :transition="false"
               class="tx-settings-dialog">
       <template #activator="{ props }">
         <v-btn v-bind="props" variant="text" size="small" density="comfortable"
@@ -80,10 +80,10 @@ TX.components.SettingsMenu = {
       <div class="tx-settings-page">
         <header class="tx-settings-bar">
           <h2 class="tx-settings-title">{{ t('settings.aria') }}</h2>
-          <v-btn variant="text" size="small" density="comfortable"
-                 class="tx-settings-close" :icon="icons.close"
+          <v-btn variant="tonal" size="small" class="tx-settings-close"
+                 :prepend-icon="icons.close"
                  :aria-label="t('settings.close')"
-                 @click="open = false" />
+                 @click="open = false">{{ t('settings.done') }}</v-btn>
         </header>
 
         <div class="tx-settings-menu">
