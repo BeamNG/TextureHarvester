@@ -6,8 +6,6 @@ Mark a surface in a photograph, get a flat tiling texture with a full PBR materi
 
 ![Texture Harvester](assets/demo.gif)
 
-![Full workspace](assets/feature-overview.png)
-
 ## Why try it
 
 Small features that usually mean opening three other tools.
