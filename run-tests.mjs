@@ -36,6 +36,8 @@ function runPage(name) {
       "--allow-file-access-from-files",
       "--no-sandbox",
       "--disable-dev-shm-usage",
+      // Pin size so dock hit-tests do not depend on the runner's default viewport.
+      "--window-size=1280,800",
       // Image encoding and storage probes consume virtual time, not wall clock.
       "--virtual-time-budget=12000000",
       `--user-data-dir=${profile}`,

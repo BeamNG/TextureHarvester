@@ -255,29 +255,37 @@ function drawReadings(ctx, field, at) {
   const width = Math.hypot(at(1, 0.5).x - at(0, 0.5).x, at(1, 0.5).y - at(0, 0.5).y);
   const height = Math.hypot(at(0.5, 1).x - at(0.5, 0).x, at(0.5, 1).y - at(0.5, 0).y);
   const step = 76;
-  const cols = Math.round(width / step);
-  const rows = Math.round(height / step);
-  if (cols < 1 || rows < 1 || cols * rows > 64) return;
+  let cols = Math.max(1, Math.round(width / step));
+  let rows = Math.max(1, Math.round(height / step));
+  // Cap the grid — a silent early-return left big zoomed slices with no readings.
+  while (cols * rows > 64) {
+    if (cols >= rows) cols -= 1;
+    else rows -= 1;
+  }
 
   ctx.font = "600 10px ui-monospace, monospace";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
+  const drawOne = (u, v) => {
+    const value = sample(field, u, v);
+    if (value == null) return;
+    const { x, y } = at(u, v);
+    const text = formatValue(field, value);
+    const w = ctx.measureText(text).width;
+    ctx.fillStyle = "rgba(0,0,0,0.55)";
+    ctx.fillRect(x - w / 2 - 4, y - 8, w + 8, 16);
+    ctx.fillStyle = "#fff";
+    ctx.fillText(text, x, y + 0.5);
+  };
+
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
-      const u = (col + 0.5) / cols;
-      const v = (row + 0.5) / rows;
-      const value = sample(field, u, v);
-      if (value == null) continue;
-      const { x, y } = at(u, v);
-      const text = formatValue(field, value);
-      const w = ctx.measureText(text).width;
-      ctx.fillStyle = "rgba(0,0,0,0.55)";
-      ctx.fillRect(x - w / 2 - 4, y - 8, w + 8, 16);
-      ctx.fillStyle = "#fff";
-      ctx.fillText(text, x, y + 0.5);
+      drawOne((col + 0.5) / cols, (row + 0.5) / rows);
     }
   }
+  // Even grids miss u=v=0.5; keep a reading where the eye looks.
+  if (cols % 2 === 0 || rows % 2 === 0) drawOne(0.5, 0.5);
 }
 
 const OVERLAY_SIDES = [256, 512, 1024];

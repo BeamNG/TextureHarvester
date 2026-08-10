@@ -169,7 +169,7 @@ TX.components.ShortcutsDialog = {
     },
   },
   template: `
-    <v-dialog :model-value="modelValue" max-width="620"
+    <v-dialog :model-value="modelValue" max-width="620" :transition="false"
               @update:model-value="$emit('update:modelValue', $event)">
       <v-card>
         <v-card-title class="text-body-1">

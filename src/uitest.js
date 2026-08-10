@@ -31,7 +31,15 @@ const waitFor = async predicate => {
 
 // Headless: hide closed Vuetify overlays (leave transition never runs)
 const dismissOverlays = () => {
+  const helpOpen = !!(TX.app && TX.app.helpOpen);
   for (const overlay of document.querySelectorAll(".v-overlay")) {
+    const isHelp = !!overlay.querySelector(".tx-help-row, .tx-help-group");
+    // A closed shortcuts dialog can keep v-overlay--active under virtual time.
+    if (isHelp && !helpOpen) {
+      overlay.classList.remove("v-overlay--active");
+      overlay.style.display = "none";
+      continue;
+    }
     const shown = overlay.classList.contains("v-overlay--active");
     for (const el of overlay.querySelectorAll(".v-overlay__content, .v-overlay__scrim")) {
       el.style.display = shown ? "" : "none";
@@ -1291,6 +1299,7 @@ async function runDepthChecks(texture, view) {
       empty ? empty.textContent.replace(/\s+/g, " ").trim() : "");
 
     if (button) {
+      dismissOverlays();
       const box = button.getBoundingClientRect();
       const at = box.width && box.height
         ? document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
@@ -1448,6 +1457,8 @@ async function runPreview3dChecks(app, texture) {
   const store = TX.store;
   const state = store.state;
 
+  dismissOverlays();
+
   const tab = tabOf("preview3d");
   check("the 3D preview has a tab", !!tab);
   if (tab) {
@@ -1601,15 +1612,23 @@ async function runPreview3dChecks(app, texture) {
   const tools = [...panel.querySelectorAll(".tx-3d-tools .v-btn")];
   check("the viewport has an icon strip instead", tools.length === 7, String(tools.length));
 
-  const covered = tools.filter(button => {
+  // Closed Vuetify dialogs can leave an active overlay under headless virtual time.
+  dismissOverlays();
+  const hitOf = button => {
     const box = button.getBoundingClientRect();
-    if (!box.width || !box.height) return true;
-    const at = document.elementFromPoint(
-      box.left + box.width / 2, box.top + box.height / 2);
+    if (!box.width || !box.height) return null;
+    return document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+  };
+  const covered = tools.filter(button => {
+    const at = hitOf(button);
     return !at || !button.contains(at);
   });
   check("and every button in it is what a pointer there would actually hit",
-    covered.length === 0, `${covered.length} of ${tools.length} covered by the canvas`);
+    covered.length === 0, `${covered.length} of ${tools.length} covered: ` + covered.map(button => {
+      const at = hitOf(button);
+      if (!button.getBoundingClientRect().width) return "zero-sized";
+      return at ? (at.className || at.tagName) : "nothing";
+    }).join(" / "));
 
   const rough = [...materialGroup().querySelectorAll(".tx-props-slider")]
     .find(el => el.textContent.trim().startsWith("Roughness"))
@@ -2706,6 +2725,7 @@ async function runStatusBarChecks(app, texture) {
           app.helpOpen === true);
         app.helpOpen = false;
         await settle();
+        dismissOverlays();
       }
     }
     await closeSettingsMenu();
