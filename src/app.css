@@ -1093,14 +1093,48 @@ body.tx-dock-resizing {
   color: #4fc3f7;
 }
 
-/* ---- settings menu ---- */
+/* ---- settings (fullscreen) ---- */
+
+.tx-settings-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--tx-bg);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.tx-settings-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 10px 12px;
+  padding-top: max(10px, env(safe-area-inset-top));
+  padding-right: max(12px, env(safe-area-inset-right));
+  padding-left: max(12px, env(safe-area-inset-left));
+  border-bottom: 1px solid var(--tx-border);
+  background: var(--tx-panel);
+}
+
+.tx-settings-title {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
 
 .tx-settings-menu {
-  min-width: 288px;
-  padding: 10px 14px 14px;
-  background: var(--tx-panel);
-  border: 1px solid var(--tx-border);
-  border-radius: 6px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 12px 16px 28px;
+  padding-bottom: max(28px, env(safe-area-inset-bottom));
+  box-sizing: border-box;
 }
 
 .tx-settings-section {

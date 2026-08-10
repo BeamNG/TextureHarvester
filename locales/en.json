@@ -34,6 +34,7 @@
   "toolbar.export.shortcut.model": "Ctrl+G",
   "toolbar.clear.tip": "Remove every image and texture and start again",
   "settings.aria": "Settings",
+  "settings.close": "Close settings",
   "settings.hint": "Settings — grid, welding, sampling quality and packing, which shape every texture rather than one of them. Currently {parts}",
   "settings.hint.grid": "{size}px grid",
   "settings.hint.sampling": "{n}× sampling",

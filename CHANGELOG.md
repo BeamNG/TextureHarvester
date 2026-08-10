@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.4.0] — 2026-08-10
+
+### Changed
+- Settings opens as a fullscreen, scrollable page instead of a dropdown menu
+
 ## [0.3.0] — 2026-08-10
 
 ### Added

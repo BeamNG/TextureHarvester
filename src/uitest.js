@@ -46,7 +46,10 @@ const settingsMenu = () => {
 };
 
 const closeSettingsMenu = async () => {
-  if (settingsMenu()) document.querySelector(".tx-settings-btn").click();
+  if (!settingsMenu()) return;
+  const close = document.querySelector(".tx-settings-close");
+  if (close) close.click();
+  else document.querySelector(".tx-settings-btn")?.click();
   await waitFor(() => !settingsMenu());
   dismissOverlays();
 };

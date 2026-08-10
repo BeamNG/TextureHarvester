@@ -69,129 +69,140 @@ TX.components.SettingsMenu = {
     },
   },
   template: `
-    <v-menu v-model="open" :close-on-content-click="false" location="bottom end">
+    <v-dialog v-model="open" fullscreen transition="dialog-bottom-transition"
+              class="tx-settings-dialog">
       <template #activator="{ props }">
         <v-btn v-bind="props" variant="text" size="small" density="comfortable"
                class="tx-settings-btn" :icon="icons.settings"
                :aria-label="t('settings.aria')" v-tip="hint" />
       </template>
 
-      <div class="tx-settings-menu">
-        <div class="tx-settings-section">{{ t('settings.section.panels') }}</div>
-        <button v-for="panel in panels" :key="panel.id" type="button"
-                class="tx-settings-item"
-                :class="{ 'tx-settings-item--on': panel.visible }"
-                :aria-pressed="panel.visible ? 'true' : 'false'"
-                v-tip="panel.hint" @click="$emit('toggle-panel', panel.id)">
-          <v-icon :icon="panel.visible ? icons.check : ''" size="14" />
-          <span>{{ panel.title }}</span>
-        </button>
-        <button type="button" class="tx-settings-item tx-settings-reset"
-                v-tip="t('settings.reset_layout.tip')"
-                @click="resetLayout">
-          <v-icon :icon="icons.reset" size="14" />
-          <span>{{ t('settings.reset_layout') }}</span>
-        </button>
+      <div class="tx-settings-page">
+        <header class="tx-settings-bar">
+          <h2 class="tx-settings-title">{{ t('settings.aria') }}</h2>
+          <v-btn variant="text" size="small" density="comfortable"
+                 class="tx-settings-close" :icon="icons.close"
+                 :aria-label="t('settings.close')"
+                 @click="open = false" />
+        </header>
 
-        <v-divider class="my-2" />
+        <div class="tx-settings-menu">
+          <div class="tx-settings-section">{{ t('settings.section.panels') }}</div>
+          <button v-for="panel in panels" :key="panel.id" type="button"
+                  class="tx-settings-item"
+                  :class="{ 'tx-settings-item--on': panel.visible }"
+                  :aria-pressed="panel.visible ? 'true' : 'false'"
+                  v-tip="panel.hint" @click="$emit('toggle-panel', panel.id)">
+            <v-icon :icon="panel.visible ? icons.check : ''" size="14" />
+            <span>{{ panel.title }}</span>
+          </button>
+          <button type="button" class="tx-settings-item tx-settings-reset"
+                  v-tip="t('settings.reset_layout.tip')"
+                  @click="resetLayout">
+            <v-icon :icon="icons.reset" size="14" />
+            <span>{{ t('settings.reset_layout') }}</span>
+          </button>
 
-        <div class="tx-settings-section">{{ t('settings.language') }}</div>
-        <label class="tx-settings-row tx-settings-row--wide" v-tip="t('settings.language.tip')">
-          <span>{{ t('settings.language') }}</span>
-          <v-select :model-value="settings.locale"
-                    @update:model-value="setLocale($event)"
-                    :items="locales" item-title="name" item-value="code"
-                    density="compact" variant="outlined" hide-details />
-        </label>
+          <v-divider class="my-2" />
 
-        <v-divider class="my-2" />
+          <div class="tx-settings-section">{{ t('settings.language') }}</div>
+          <label class="tx-settings-row tx-settings-row--wide" v-tip="t('settings.language.tip')">
+            <span>{{ t('settings.language') }}</span>
+            <v-select :model-value="settings.locale"
+                      @update:model-value="setLocale($event)"
+                      :items="locales" item-title="name" item-value="code"
+                      density="compact" variant="outlined" hide-details />
+          </label>
 
-        <div class="tx-settings-section">{{ t('settings.section.grid') }}</div>
-        <label class="tx-settings-row" v-tip="t('settings.grid.cell_size.tip')">
-          <span>{{ t('settings.grid.cell_size') }}</span>
-          <input type="number" min="1" max="1024" step="1" :value="settings.gridSize"
-                 @change="clamp('gridSize', $event.target.value, 1, 1024, 16)" />
-          <em>px</em>
-        </label>
-        <v-switch v-model="settings.snapToGrid" :label="t('settings.grid.snap')"
-                  density="compact" hide-details color="primary" class="tx-props-switch"
-                  v-tip="t('settings.grid.snap.tip')" />
-        <v-switch v-model="settings.showGrid" :label="t('settings.grid.draw')"
-                  density="compact" hide-details color="primary" class="tx-props-switch"
-                  v-tip="t('settings.grid.draw.tip')" />
+          <v-divider class="my-2" />
 
-        <v-divider class="my-2" />
+          <div class="tx-settings-section">{{ t('settings.section.grid') }}</div>
+          <label class="tx-settings-row" v-tip="t('settings.grid.cell_size.tip')">
+            <span>{{ t('settings.grid.cell_size') }}</span>
+            <input type="number" min="1" max="1024" step="1" :value="settings.gridSize"
+                   @change="clamp('gridSize', $event.target.value, 1, 1024, 16)" />
+            <em>px</em>
+          </label>
+          <v-switch v-model="settings.snapToGrid" :label="t('settings.grid.snap')"
+                    density="compact" hide-details color="primary" class="tx-props-switch"
+                    v-tip="t('settings.grid.snap.tip')" />
+          <v-switch v-model="settings.showGrid" :label="t('settings.grid.draw')"
+                    density="compact" hide-details color="primary" class="tx-props-switch"
+                    v-tip="t('settings.grid.draw.tip')" />
 
-        <div class="tx-settings-section">{{ t('settings.section.marking') }}</div>
-        <label class="tx-settings-row" v-tip="t('settings.weld_radius.tip')">
-          <span>{{ t('settings.weld_radius') }}</span>
-          <input type="number" min="0" max="64" step="1" :value="settings.weldRadius"
-                 @change="clamp('weldRadius', $event.target.value, 0, 64, 8)" />
-          <em>px</em>
-        </label>
+          <v-divider class="my-2" />
 
-        <v-divider class="my-2" />
+          <div class="tx-settings-section">{{ t('settings.section.marking') }}</div>
+          <label class="tx-settings-row" v-tip="t('settings.weld_radius.tip')">
+            <span>{{ t('settings.weld_radius') }}</span>
+            <input type="number" min="0" max="64" step="1" :value="settings.weldRadius"
+                   @change="clamp('weldRadius', $event.target.value, 0, 64, 8)" />
+            <em>px</em>
+          </label>
 
-        <div class="tx-settings-section">{{ t('settings.section.extraction') }}</div>
-        <label class="tx-settings-row tx-settings-row--wide"
-               v-tip="t('settings.supersample.tip')">
-          <span>{{ t('settings.supersample') }}</span>
-          <v-select :model-value="settings.supersample"
-                    @update:model-value="settings.supersample = $event"
-                    :items="supersample" item-title="title" item-value="value"
-                    density="compact" variant="outlined" hide-details />
-        </label>
-        <p class="tx-props-note">{{ t('settings.supersample.note') }}</p>
+          <v-divider class="my-2" />
 
-        <v-divider class="my-2" />
+          <div class="tx-settings-section">{{ t('settings.section.extraction') }}</div>
+          <label class="tx-settings-row tx-settings-row--wide"
+                 v-tip="t('settings.supersample.tip')">
+            <span>{{ t('settings.supersample') }}</span>
+            <v-select :model-value="settings.supersample"
+                      @update:model-value="settings.supersample = $event"
+                      :items="supersample" item-title="title" item-value="value"
+                      density="compact" variant="outlined" hide-details />
+          </label>
+          <p class="tx-props-note">{{ t('settings.supersample.note') }}</p>
 
-        <div class="tx-settings-section">{{ t('settings.section.packing') }}</div>
-        <label class="tx-settings-row" v-tip="t('settings.padding.tip')">
-          <span>{{ t('settings.padding') }}</span>
-          <input type="number" min="0" max="256" step="1" :value="settings.padding"
-                 @change="clamp('padding', $event.target.value, 0, 256, 2)" />
-          <em>px</em>
-        </label>
-        <v-switch v-model="settings.powerOfTwo" :label="t('settings.power_of_two')"
-                  density="compact" hide-details color="primary" class="tx-props-switch"
-                  v-tip="t('settings.power_of_two.tip')" />
+          <v-divider class="my-2" />
 
-        <v-divider class="my-2" />
+          <div class="tx-settings-section">{{ t('settings.section.packing') }}</div>
+          <label class="tx-settings-row" v-tip="t('settings.padding.tip')">
+            <span>{{ t('settings.padding') }}</span>
+            <input type="number" min="0" max="256" step="1" :value="settings.padding"
+                   @change="clamp('padding', $event.target.value, 0, 256, 2)" />
+            <em>px</em>
+          </label>
+          <v-switch v-model="settings.powerOfTwo" :label="t('settings.power_of_two')"
+                    density="compact" hide-details color="primary" class="tx-props-switch"
+                    v-tip="t('settings.power_of_two.tip')" />
 
-        <div class="tx-settings-section">{{ t('settings.section.export') }}</div>
-        <v-switch v-model="settings.exportMaps" :label="t('settings.export_maps')"
-                  density="compact" hide-details color="primary"
-                  class="tx-props-switch tx-export-maps"
-                  v-tip="t('settings.export_maps.tip')" />
-        <p class="tx-props-note">{{ t('settings.export_maps.note') }}</p>
+          <v-divider class="my-2" />
 
-        <v-divider class="my-2" />
+          <div class="tx-settings-section">{{ t('settings.section.export') }}</div>
+          <v-switch v-model="settings.exportMaps" :label="t('settings.export_maps')"
+                    density="compact" hide-details color="primary"
+                    class="tx-props-switch tx-export-maps"
+                    v-tip="t('settings.export_maps.tip')" />
+          <p class="tx-props-note">{{ t('settings.export_maps.note') }}</p>
 
-        <div class="tx-settings-section">{{ t('settings.section.ai') }}</div>
-        <v-switch :model-value="settings.ai" @update:model-value="setAi($event)"
-                  :label="t('settings.ai')"
-                  density="compact" hide-details color="primary"
-                  class="tx-props-switch tx-settings-ai"
-                  v-tip="t('settings.ai.tip')" />
-        <p class="tx-props-note">
-          {{ t('settings.ai.note') }}
-          <a :href="modelUrl" target="_blank" rel="noopener noreferrer">{{ model }}</a>
-        </p>
-        <p class="tx-props-note">{{ t('settings.ai.rest', {
-          flatten: t('context.flatten_lighting'), pbr: t('props.material.generate_pbr'),
-        }) }}</p>
+          <v-divider class="my-2" />
 
-        <v-divider class="my-2" />
+          <div class="tx-settings-section">{{ t('settings.section.ai') }}</div>
+          <v-switch :model-value="settings.ai" @update:model-value="setAi($event)"
+                    :label="t('settings.ai')"
+                    density="compact" hide-details color="primary"
+                    class="tx-props-switch tx-settings-ai"
+                    v-tip="t('settings.ai.tip')" />
+          <p class="tx-props-note">
+            {{ t('settings.ai.note') }}
+            <a :href="modelUrl" target="_blank" rel="noopener noreferrer">{{ model }}</a>
+          </p>
+          <p class="tx-props-note">{{ t('settings.ai.rest', {
+            flatten: t('context.flatten_lighting'), pbr: t('props.material.generate_pbr'),
+          }) }}</p>
 
-        <div class="tx-settings-section">{{ t('settings.section.help') }}</div>
-        <button type="button" class="tx-settings-item tx-settings-shortcuts"
-                v-tip="t('settings.shortcuts.tip')"
-                @click="showShortcuts">
-          <v-icon :icon="icons.help" size="14" />
-          <span>{{ t('settings.shortcuts') }}</span>
-          <kbd>F1</kbd>
-        </button>
+          <v-divider class="my-2" />
+
+          <div class="tx-settings-section">{{ t('settings.section.help') }}</div>
+          <button type="button" class="tx-settings-item tx-settings-shortcuts"
+                  v-tip="t('settings.shortcuts.tip')"
+                  @click="showShortcuts">
+            <v-icon :icon="icons.help" size="14" />
+            <span>{{ t('settings.shortcuts') }}</span>
+            <kbd>F1</kbd>
+          </button>
+        </div>
       </div>
-    </v-menu>
+    </v-dialog>
   `,
 };
