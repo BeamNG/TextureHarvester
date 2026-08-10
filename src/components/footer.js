@@ -4,10 +4,6 @@ TX.components = TX.components || {};
 
 const hint = (keys, label) => ({ keys, label });
 
-const coarsePointer = () => typeof window !== "undefined"
-  && window.matchMedia
-  && window.matchMedia("(pointer: coarse)").matches;
-
 const SELECTED_NOUNS = {
   texture: ["status.usage.textures_one", "status.usage.textures_other"],
   image: ["status.usage.images_one", "status.usage.images_other"],
@@ -24,26 +20,40 @@ function megabytes(bytes) {
 }
 
 function markHints(stats) {
-  const touch = coarsePointer();
+  const touch = TX.device.touch;
   const placeKey = touch ? "status.hint.keys.long_press" : "status.hint.keys.ctrl_click";
   const placeNext = touch ? "status.hint.keys.tap" : "status.hint.keys.ctrl_click";
   const edgeKey = touch ? "status.hint.keys.long_press" : "status.hint.keys.ctrl_drag";
   if (!stats.images) {
+    if (touch) {
+      return [hint(TX.t("status.hint.keys.drop"), TX.t("status.hint.mark.drop"))];
+    }
     return [
       hint(TX.t("status.hint.keys.shift_a"), TX.t("status.hint.mark.import_images")),
       hint(TX.t("status.hint.keys.drop"), TX.t("status.hint.mark.drop")),
     ];
   }
   if (stats.pending) {
-    return [
+    const list = [
       hint(TX.t("status.hint.mark.points_frac", { pending: stats.pending }),
         TX.t("status.hint.mark.points_placed")),
       hint(TX.t(placeNext), TX.t("status.hint.mark.place_next")),
-      hint(TX.t("status.hint.keys.right_click"), TX.t("status.hint.mark.abandon")),
     ];
+    if (!touch) {
+      list.push(hint(TX.t("status.hint.keys.right_click"), TX.t("status.hint.mark.abandon")));
+    }
+    return list;
   }
   if (stats.kind === "mark") {
     const marks = stats.selected;
+    if (touch) {
+      return [
+        hint(TX.t(marks === 1 ? "status.hint.mark.n_selected_one" : "status.hint.mark.n_selected_other",
+          { count: marks }), TX.t("status.hint.mark.selected")),
+        hint(TX.t("status.hint.keys.drag"), TX.t("status.hint.mark.move")),
+        hint(TX.t("status.hint.keys.handles"), TX.t("status.hint.mark.handles")),
+      ];
+    }
     return [
       hint(TX.t(marks === 1 ? "status.hint.mark.n_selected_one" : "status.hint.mark.n_selected_other",
         { count: marks }), TX.t("status.hint.mark.selected")),
@@ -60,10 +70,14 @@ function markHints(stats) {
   ];
   if (touch) {
     hints.push(hint(TX.t("status.hint.keys.pinch"), TX.t("status.hint.tiling.zoom")));
+    if (stats.marks) {
+      hints.push(hint(TX.t("status.hint.keys.tap"), TX.t("status.hint.mark.select")));
+    }
+    return hints;
   }
   if (stats.marks) {
     hints.push(
-      hint(TX.t(touch ? "status.hint.keys.tap" : "status.hint.keys.click"), TX.t("status.hint.mark.select")),
+      hint(TX.t("status.hint.keys.click"), TX.t("status.hint.mark.select")),
       hint(TX.t("status.hint.keys.shift_drag"), TX.t("status.hint.mark.precision")),
       hint(TX.t("status.hint.keys.alt_click"), TX.t("status.hint.mark.remove_one")));
   }
@@ -71,15 +85,27 @@ function markHints(stats) {
 }
 
 function atlasHints(stats) {
+  const touch = TX.device.touch;
   if (!stats.textures) {
-    return [hint(TX.t("status.hint.keys.ctrl_click"), TX.t("status.hint.atlas.mark_in_source"))];
+    return [hint(
+      TX.t(touch ? "status.hint.keys.long_press" : "status.hint.keys.ctrl_click"),
+      TX.t("status.hint.atlas.mark_in_source"),
+    )];
   }
   if (!stats.selectedTextures) {
+    if (touch) {
+      return [hint(TX.t("status.hint.keys.tap"), TX.t("status.hint.atlas.select"))];
+    }
     return [
       hint(TX.t("status.hint.keys.click"), TX.t("status.hint.atlas.select")),
       hint(TX.t("status.hint.keys.shift_drag"), TX.t("status.hint.atlas.marquee")),
       hint(TX.t("status.hint.keys.ctrl_a"), TX.t("status.hint.atlas.select_all")),
       hint(TX.t("status.hint.keys.ctrl_e"), TX.t("status.hint.atlas.export")),
+    ];
+  }
+  if (touch) {
+    return [
+      hint(TX.t("status.hint.keys.drag"), TX.t("status.hint.atlas.move")),
     ];
   }
   return [
@@ -94,41 +120,59 @@ function atlasHints(stats) {
 }
 
 function tilingHints(stats) {
-  const touch = coarsePointer();
+  const touch = TX.device.touch;
   if (stats.selectedTextures !== 1) {
-    return [hint(TX.t("status.hint.keys.click"), TX.t("status.hint.tiling.select_one"))];
+    return [hint(
+      TX.t(touch ? "status.hint.keys.tap" : "status.hint.keys.click"),
+      TX.t("status.hint.tiling.select_one"),
+    )];
+  }
+  if (touch) {
+    return [
+      hint(TX.t("status.hint.keys.drag"), TX.t("status.hint.tiling.pan")),
+      hint(TX.t("status.hint.keys.pinch"), TX.t("status.hint.tiling.zoom")),
+    ];
   }
   return [
     hint(TX.t("status.hint.keys.drag"), TX.t("status.hint.tiling.pan")),
-    hint(TX.t(touch ? "status.hint.keys.pinch" : "status.hint.keys.scroll"),
-      TX.t("status.hint.tiling.zoom")),
+    hint(TX.t("status.hint.keys.scroll"), TX.t("status.hint.tiling.zoom")),
     hint(TX.t("status.hint.keys.double_click"), TX.t("status.hint.tiling.fit")),
     hint(TX.t("status.hint.keys.toolbar_above"), TX.t("status.hint.tiling.toolbar")),
   ];
 }
 
 function preview3dHints(stats) {
-  const touch = coarsePointer();
-  if (stats.selectedTextures !== 1) {
-    return [hint(TX.t("status.hint.keys.click"), TX.t("status.hint.preview3d.select_one"))];
+  const touch = TX.device.touch;
+  if (stats.selectedTextures !== 1 && stats.kind !== "image") {
+    return [hint(
+      TX.t(touch ? "status.hint.keys.tap" : "status.hint.keys.click"),
+      TX.t("status.hint.preview3d.select_one"),
+    )];
+  }
+  if (touch) {
+    return [
+      hint(TX.t("status.hint.keys.drag"), TX.t("status.hint.preview3d.orbit")),
+      hint(TX.t("status.hint.keys.pinch"), TX.t("status.hint.preview3d.zoom")),
+      hint(TX.t("status.hint.keys.two_fingers"), TX.t("status.hint.preview3d.pan")),
+    ];
   }
   return [
     hint(TX.t("status.hint.keys.drag"), TX.t("status.hint.preview3d.orbit")),
-    hint(TX.t(touch ? "status.hint.keys.pinch" : "status.hint.keys.scroll"),
-      TX.t("status.hint.preview3d.zoom")),
-    hint(TX.t(touch ? "status.hint.keys.two_fingers" : "status.hint.keys.right_drag"),
-      TX.t("status.hint.preview3d.pan")),
+    hint(TX.t("status.hint.keys.scroll"), TX.t("status.hint.preview3d.zoom")),
+    hint(TX.t("status.hint.keys.right_drag"), TX.t("status.hint.preview3d.pan")),
     hint(TX.t("status.hint.keys.ctrl_g"), TX.t("status.hint.preview3d.export_glb")),
   ];
 }
 
 function propertiesHints(stats) {
+  const touch = TX.device.touch;
   if (stats.kind === "mark" && stats.selected === 1) {
-    return [
+    const list = [
       hint(TX.t("status.hint.keys.editing"), TX.t("status.hint.properties.editing_mark")),
       hint(TX.t("status.hint.keys.handles"), TX.t("status.hint.properties.handles")),
-      hint(TX.t("status.hint.keys.ctrl_z"), TX.t("status.hint.properties.undo")),
     ];
+    if (!touch) list.push(hint(TX.t("status.hint.keys.ctrl_z"), TX.t("status.hint.properties.undo")));
+    return list;
   }
   if (stats.kind === "image" && stats.selected === 1) {
     return [
@@ -137,12 +181,16 @@ function propertiesHints(stats) {
     ];
   }
   if (stats.selectedTextures === 1) {
+    if (touch) return [];
     return [
       hint(TX.t("status.hint.keys.ctrl_z"), TX.t("status.hint.properties.undo")),
       hint(TX.t("status.hint.keys.alt_drag"), TX.t("status.hint.properties.local_space")),
     ];
   }
-  return [hint(TX.t("status.hint.keys.click"), TX.t("status.hint.properties.select"))];
+  return [hint(
+    TX.t(touch ? "status.hint.keys.tap" : "status.hint.keys.click"),
+    TX.t("status.hint.properties.select"),
+  )];
 }
 
 const PANEL_HINTS = {
@@ -162,7 +210,12 @@ TX.components.StatusBar = {
   },
   emits: ["reveal"],
   setup() {
-    return { icons: TX.icons.app, state: TX.store.state, i18n: TX.i18n.status };
+    return {
+      icons: TX.icons.app,
+      state: TX.store.state,
+      i18n: TX.i18n.status,
+      device: TX.device.status,
+    };
   },
   data() {
     return { problemsOpen: false };
@@ -208,8 +261,11 @@ TX.components.StatusBar = {
     },
     hints() {
       void this.i18n.locale;
+      void this.device.touch;
+      void this.device.compact;
       const build = PANEL_HINTS[this.activePanel] || PANEL_HINTS.mark;
-      return build(this.stats);
+      const list = build(this.stats);
+      return this.device.compact ? list.slice(0, 2) : list;
     },
     storageWarning() {
       void this.i18n.locale;

@@ -91,6 +91,11 @@ async function run() {
   await settle();
 
   const app = TX.app;
+  if (app.introOpen) {
+    app.introOpen = false;
+    TX.intro.saveSeen();
+    await settle();
+  }
   const dock = TX.dockTree;
 
   // ---- default layout ----------------------------------------------------
@@ -335,12 +340,12 @@ async function run() {
   await closeSettingsMenu();
 
   // ---- persistence -------------------------------------------------------
-  const saved = TX.dock.load();
+  const saved = TX.dock.load(app.dockState.mode || "desktop");
   check("the layout is persisted", !!saved && TX.dockTree.isValid(saved.root));
   localStorage.setItem(TX.dock.LAYOUT_KEY, JSON.stringify({ v: 999, data: saved }));
-  check("a layout from another version is refused", TX.dock.load() === null);
+  check("a layout from another version is refused", TX.dock.load("desktop") === null);
   TX.dock.save(app.dockState);
-  check("saving again makes it readable", !!TX.dock.load());
+  check("saving again makes it readable", !!TX.dock.load(app.dockState.mode || "desktop"));
   check("the persisted layout matches what is on screen",
     !!saved && dock.collectPanels(saved.root).sort().join(",")
       === dock.collectPanels(app.dockState.root).sort().join(","),

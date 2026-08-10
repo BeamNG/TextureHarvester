@@ -7,10 +7,13 @@ const { snapTo, nodeCorners, nodeCenter, worldToLocal, localToWorld, hitTestNode
 
 const POINT_RADIUS = 6;
 const POINT_GRAB = 10;
+const POINT_GRAB_TOUCH = 22;
 const PIVOT_RADIUS = 4.5;
 const PIVOT_GRAB = 9;
+const PIVOT_GRAB_TOUCH = 20;
 const CURVE_STEPS = 12;
 const HOVER_SLOP = 10;
+const HOVER_SLOP_TOUCH = 22;
 const LINE_DRAG_MIN = 6;
 const TOUCH_MOVE_MAX = 10;
 const LONG_PRESS_MS = 420;
@@ -18,6 +21,11 @@ const PRECISION_FACTOR = 0.2;
 const LOUPE_RADIUS = 80;
 const LOUPE_SAMPLE_MIN = 12;
 const LOUPE_SAMPLE_MAX = 1024;
+
+const touchUi = () => !!(TX.device && TX.device.touch);
+const grabPoint = () => (touchUi() ? POINT_GRAB_TOUCH : POINT_GRAB);
+const grabPivot = () => (touchUi() ? PIVOT_GRAB_TOUCH : PIVOT_GRAB);
+const grabEdge = () => (touchUi() ? HOVER_SLOP_TOUCH : HOVER_SLOP);
 const LOUPE_SAMPLE_DEFAULT = 32;
 const zoomLabel = z => (z >= 10 ? z.toFixed(0) : z >= 1 ? z.toFixed(1) : z.toFixed(2));
 
@@ -581,7 +589,7 @@ function createMarkCanvas(container, hooks) {
         for (let i = 0; i < mark.points.length; i++) {
           const world = localToWorld(image, mark.points[i]);
           const at = stage.worldToScreen(world.x, world.y);
-          if (Math.hypot(at.x - screen.x, at.y - screen.y) <= POINT_GRAB) {
+          if (Math.hypot(at.x - screen.x, at.y - screen.y) <= grabPoint()) {
             return { markId: mark.id, index: i, imageId: image.id };
           }
         }
@@ -606,7 +614,7 @@ function createMarkCanvas(container, hooks) {
           return stage.worldToScreen(world.x, world.y);
         });
         for (let i = 0; i < 4; i++) {
-          if (distToSegment(screen, corners[i], corners[(i + 1) % 4]) <= HOVER_SLOP) {
+          if (distToSegment(screen, corners[i], corners[(i + 1) % 4]) <= grabEdge()) {
             return mark;
           }
         }
@@ -626,7 +634,7 @@ function createMarkCanvas(container, hooks) {
           const controls = TX.geom.edgeControls(geo.curve, k);
           for (let i = 0; i < 2; i++) {
             const at = geo.atLocal(controls[i]);
-            if (Math.hypot(at.x - screen.x, at.y - screen.y) <= PIVOT_GRAB) {
+            if (Math.hypot(at.x - screen.x, at.y - screen.y) <= grabPivot()) {
               return { markId: mark.id, index: k, which: i, imageId: image.id };
             }
           }

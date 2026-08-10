@@ -52,7 +52,9 @@ function createStage(container, options) {
     const rect = container.getBoundingClientRect();
     const width = Math.max(1, Math.round(rect.width));
     const height = Math.max(1, Math.round(rect.height));
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const dpr = TX.device.pixelRatio();
+
+    if (width === view.width && height === view.height && dpr === view.dpr) return;
 
     view.width = width;
     view.height = height;
@@ -61,10 +63,10 @@ function createStage(container, options) {
     renderer.setPixelRatio(dpr);
     renderer.setSize(width, height, false);
 
-    overlay.width = Math.round(width * dpr);
-    overlay.height = Math.round(height * dpr);
-    overlay.style.width = `${width}px`;
-    overlay.style.height = `${height}px`;
+    overlay.width = Math.max(1, Math.round(width * dpr));
+    overlay.height = Math.max(1, Math.round(height * dpr));
+    overlay.style.width = "";
+    overlay.style.height = "";
 
     requestRender();
   }
@@ -291,6 +293,7 @@ function createStage(container, options) {
 
   const observer = new ResizeObserver(resize);
   observer.observe(container);
+  const stopDisplay = TX.device.onDisplayChange(resize);
   resize();
   frame = requestAnimationFrame(tick);
 
@@ -298,6 +301,7 @@ function createStage(container, options) {
     disposed = true;
     cancelAnimationFrame(frame);
     observer.disconnect();
+    if (stopDisplay) stopDisplay();
     overlay.removeEventListener("pointerdown", onTouchTrack, true);
     overlay.removeEventListener("pointermove", onTouchTrack, true);
     overlay.removeEventListener("pointerup", onTouchTrack, true);

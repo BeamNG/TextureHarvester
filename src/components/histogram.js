@@ -15,7 +15,7 @@ TX.components.Histogram = {
     return { i18n: TX.i18n.status };
   },
   data() {
-    return { ratio: window.devicePixelRatio || 1 };
+    return {};
   },
   computed: {
     canvasHint() {
@@ -31,7 +31,11 @@ TX.components.Histogram = {
     channels() { this.$nextTick(() => this.draw()); },
   },
   mounted() {
+    this.stopDisplay = TX.device.onDisplayChange(() => this.draw());
     this.draw();
+  },
+  beforeUnmount() {
+    if (this.stopDisplay) this.stopDisplay();
   },
   methods: {
     // Clip peaks at the 98th percentile so one flat region does not flatten everything else.
@@ -60,7 +64,7 @@ TX.components.Histogram = {
     draw() {
       const canvas = this.$refs.canvas;
       if (!canvas) return;
-      const ratio = this.ratio;
+      const ratio = TX.device.pixelRatio();
       canvas.width = WIDTH * ratio;
       canvas.height = HEIGHT * ratio;
       const ctx = canvas.getContext("2d");

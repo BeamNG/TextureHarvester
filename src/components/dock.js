@@ -7,6 +7,7 @@ const tree = TX.dockTree;
 
 // Key predates the Texture Harvester rename; changing it would reset the dock layout.
 const LAYOUT_KEY = "texture-extract:layout";
+const LAYOUT_KEY_MOBILE = "texture-extract:layout-mobile";
 const MIN_FRACTION = 0.08;
 const EDGE_THRESHOLD = 26;
 const DRAG_THRESHOLD = 4;
@@ -41,57 +42,95 @@ function syncHosts(rootEl) {
   }
 }
 
-function createState(defaultRootFactory, knownPanels) {
+function keyFor(mode) {
+  return mode === "mobile" ? LAYOUT_KEY_MOBILE : LAYOUT_KEY;
+}
+
+function load(mode = "desktop") {
+  return TX.durable.read(keyFor(mode), TX.schema.layout);
+}
+
+function save(state) {
+  TX.durable.write(keyFor(state.mode || "desktop"), TX.schema.layout, {
+    root: state.root,
+    floating: state.floating.map(w => ({ ...w })),
+    maximized: state.maximized,
+  });
+}
+
+function applySaved(state, knownPanels, factory, saved) {
+  if (saved && tree.isValid(saved.root)) {
+    const reconciled = tree.reconcile(saved.root, knownPanels);
+    state.root = reconciled ? tree.reid(reconciled) : factory();
+    state.floating = (saved.floating || []).filter(w =>
+      Array.isArray(w.panels) && w.panels.every(p => knownPanels.includes(p)));
+    if (state.mode === "mobile") state.floating = [];
+    state.maximized = knownPanels.includes(saved.maximized) ? saved.maximized : null;
+
+    const placed = new Set(tree.collectPanels(state.root));
+    for (const win of state.floating) for (const p of win.panels) placed.add(p);
+    for (const panelId of knownPanels) {
+      if (placed.has(panelId)) continue;
+      if (state.mode === "mobile" && state.root && state.root.type === "tabs") {
+        state.root.panels.push(panelId);
+      } else {
+        state.root = tree.insertAtRootEdge(state.root, panelId, "right");
+      }
+    }
+  } else {
+    state.root = factory();
+    state.floating = [];
+    state.maximized = null;
+  }
+}
+
+function createState(desktopFactory, knownPanels, mobileFactory) {
+  const mobileRoot = mobileFactory || desktopFactory;
   const state = reactive({
     root: null,
     floating: [],
     maximized: null,
     drag: null,
     drop: null,
+    mode: TX.device && TX.device.compact ? "mobile" : "desktop",
   });
 
+  const factoryOf = () => (state.mode === "mobile" ? mobileRoot : desktopFactory)();
+
   state.reset = () => {
-    state.root = defaultRootFactory();
+    state.root = factoryOf();
     state.floating = [];
     state.maximized = null;
+    state.drag = null;
+    state.drop = null;
     save(state);
   };
 
+  state.setMode = mode => {
+    const next = mode === "mobile" ? "mobile" : "desktop";
+    if (state.mode === next) return;
+    save(state);
+    state.mode = next;
+    state.drag = null;
+    state.drop = null;
+    applySaved(state, knownPanels, factoryOf, load(next));
+  };
+
   TX.durable.onFlush(() => save(state));
-
-  const saved = load();
-  if (saved && tree.isValid(saved.root)) {
-    const reconciled = tree.reconcile(saved.root, knownPanels);
-    state.root = reconciled ? tree.reid(reconciled) : defaultRootFactory();
-    state.floating = (saved.floating || []).filter(w =>
-      Array.isArray(w.panels) && w.panels.every(p => knownPanels.includes(p)));
-    state.maximized = knownPanels.includes(saved.maximized) ? saved.maximized : null;
-
-    const placed = new Set(tree.collectPanels(state.root));
-    for (const win of state.floating) for (const p of win.panels) placed.add(p);
-    for (const panelId of knownPanels) {
-      if (!placed.has(panelId)) state.root = tree.insertAtRootEdge(state.root, panelId, "right");
-    }
-  } else {
-    state.reset();
-  }
+  applySaved(state, knownPanels, factoryOf, load(state.mode));
+  if (!state.root) state.reset();
 
   return state;
 }
-
-const load = () => TX.durable.read(LAYOUT_KEY, TX.schema.layout);
-
-const save = state => TX.durable.write(LAYOUT_KEY, TX.schema.layout, {
-  root: state.root,
-  floating: state.floating.map(w => ({ ...w })),
-  maximized: state.maximized,
-});
 
 const asRect = domRect => ({
   left: domRect.left, top: domRect.top, width: domRect.width, height: domRect.height,
 });
 
-TX.dock = { content, register, syncHosts, createState, save, load, LAYOUT_KEY };
+TX.dock = {
+  content, register, syncHosts, createState, save, load,
+  LAYOUT_KEY, LAYOUT_KEY_MOBILE,
+};
 
 TX.components.DockNode = {
   name: "DockNode",
@@ -119,16 +158,21 @@ TX.components.DockNode = {
     <div v-else class="tx-dock-group" :data-dock-node="node.id" :data-dock-group="node.id">
       <div class="tx-dock-tabs" :data-dock-tabbar="node.id">
         <div v-for="panelId in node.panels" :key="panelId"
-             class="tx-dock-tab" :class="{ 'tx-dock-tab--active': panelId === node.active }"
+             class="tx-dock-tab"
+             :class="{
+               'tx-dock-tab--active': panelId === node.active,
+               'tx-dock-tab--live': dock.live(panelId),
+             }"
              :data-dock-tab="panelId" v-tip="dock.hint(panelId)"
              @pointerdown="dock.startTabDrag(panelId, $event)">
           <span>{{ dock.title(panelId) }}</span>
+          <span v-if="dock.live(panelId)" class="tx-dock-tab-live" aria-hidden="true"></span>
           <button v-if="dock.closable(panelId)" class="tx-dock-x"
                   v-tip="t('dock.close_panel.tip')"
                   @pointerdown.stop @click.stop="dock.close(panelId)">&times;</button>
         </div>
         <div class="tx-dock-tabfill" v-tip="t('dock.drag_group.tip')"></div>
-        <button class="tx-dock-btn" v-tip="t('dock.maximize.tip')"
+        <button v-if="!dock.compact()" class="tx-dock-btn" v-tip="t('dock.maximize.tip')"
                 @click="dock.maximize(node.active)">&#9744;</button>
       </div>
       <div class="tx-dock-body" :data-dock-slot="node.active"></div>
@@ -142,6 +186,8 @@ TX.components.Dock = {
   props: {
     state: { type: Object, required: true },
     panels: { type: Object, required: true },
+    compact: { type: Boolean, default: false },
+    signals: { type: Object, default: () => ({}) },
   },
   data() {
     return { api: null };
@@ -181,13 +227,16 @@ TX.components.Dock = {
           const suffix = TX.t("dock.tab.hint_suffix");
           return own ? `${own}. ${suffix}` : suffix;
         },
-        closable: id => !this.panels[id] || this.panels[id].closable !== false,
+        closable: id => !this.compact
+          && (!this.panels[id] || this.panels[id].closable !== false),
+        live: id => !!this.signals[id],
         activate: id => { this.state.root = tree.setActive(this.state.root, id); },
         close: id => this.closePanel(id),
         open: id => this.openPanel(id),
         maximize: id => { this.state.maximized = this.state.maximized === id ? null : id; },
         startTabDrag: (id, event) => this.startTabDrag(id, event),
         startSplitDrag: (node, index, event) => this.startSplitDrag(node, index, event),
+        compact: () => this.compact,
       };
     },
 
@@ -216,6 +265,21 @@ TX.components.Dock = {
         return;
       }
       if (this.state.floating.some(w => w.panels.includes(panelId))) return;
+      if (this.compact) {
+        const root = this.state.root;
+        if (root && root.type === "tabs") {
+          root.panels = root.panels.concat(panelId);
+          root.active = panelId;
+          this.persist();
+          return;
+        }
+        this.state.root = tree.tabs(
+          tree.collectPanels(root).concat(panelId),
+          panelId,
+        );
+        this.persist();
+        return;
+      }
       this.state.root = tree.insertAtRootEdge(this.state.root, panelId, "right");
       this.persist();
     },
@@ -238,6 +302,10 @@ TX.components.Dock = {
 
     startTabDrag(panelId, event) {
       if (event.button !== 0) return;
+      if (this.compact) {
+        this.api.activate(panelId);
+        return;
+      }
       const origin = { x: event.clientX, y: event.clientY };
       let started = false;
 
@@ -510,14 +578,14 @@ TX.components.Dock = {
   },
 
   template: `
-    <div class="tx-dock" ref="surface">
+    <div class="tx-dock" ref="surface" :class="{ 'tx-dock--compact': compact }">
       <div v-if="state.maximized" class="tx-dock-group tx-dock-group--max">
         <div class="tx-dock-tabs">
           <div class="tx-dock-tab tx-dock-tab--active">
             <span>{{ api.title(state.maximized) }}</span>
           </div>
           <div class="tx-dock-tabfill"></div>
-          <button class="tx-dock-btn" v-tip="t('dock.restore.tip')"
+          <button v-if="!compact" class="tx-dock-btn" v-tip="t('dock.restore.tip')"
                   @click="state.maximized = null">&#9635;</button>
         </div>
         <div class="tx-dock-body" :data-dock-slot="state.maximized"></div>
@@ -532,11 +600,16 @@ TX.components.Dock = {
         <div v-for="win in state.floating" :key="win.id" class="tx-dock-float" :style="floatStyle(win)">
           <div class="tx-dock-tabs tx-dock-tabs--float" @pointerdown="startFloatMove(win, $event)">
             <div v-for="panelId in win.panels" :key="panelId"
-                 class="tx-dock-tab" :class="{ 'tx-dock-tab--active': panelId === win.active }"
+                 class="tx-dock-tab"
+                 :class="{
+                   'tx-dock-tab--active': panelId === win.active,
+                   'tx-dock-tab--live': api.live(panelId),
+                 }"
                  :data-dock-tab="panelId" v-tip="api.hint(panelId)"
                  @pointerdown.stop="api.startTabDrag(panelId, $event)"
                  @click.stop="win.active = panelId">
               <span>{{ api.title(panelId) }}</span>
+              <span v-if="api.live(panelId)" class="tx-dock-tab-live" aria-hidden="true"></span>
             </div>
             <div class="tx-dock-tabfill" v-tip="t('dock.float.move.tip')"></div>
             <button class="tx-dock-btn" v-tip="t('dock.float.redock.tip')"

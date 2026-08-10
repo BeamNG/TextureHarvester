@@ -35,6 +35,7 @@ import "./components/toolbar.js";
 import "./components/settings-menu.js";
 import "./components/footer.js";
 import "./components/context-menu.js";
+import "./components/intro.js";
 import "./components/dock.js";
 import "./components/histogram.js";
 import "./components/progress.js";

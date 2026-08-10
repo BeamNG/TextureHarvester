@@ -3,6 +3,7 @@ import "./lib/lens.js";
 import "./lib/zip.js";
 import "./lib/download.js";
 import "./lib/durable.js";
+import "./lib/device.js";
 import "./lib/persist.js";
 import "./lib/warp.js";
 import "./lib/pack.js";

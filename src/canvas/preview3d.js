@@ -334,7 +334,7 @@ function createPreview3d(container) {
     const rect = container.getBoundingClientRect();
     const width = Math.max(1, Math.round(rect.width));
     const height = Math.max(1, Math.round(rect.height));
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setPixelRatio(TX.device.pixelRatio());
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
@@ -386,6 +386,7 @@ function createPreview3d(container) {
 
   const observer = new ResizeObserver(resize);
   observer.observe(container);
+  const stopDisplay = TX.device.onDisplayChange(resize);
   resize();
   frame = requestAnimationFrame(tick);
 
@@ -431,6 +432,7 @@ function createPreview3d(container) {
       canvas.removeEventListener("webglcontextlost", onContextLost, false);
       if (stopWatch) stopWatch();
       observer.disconnect();
+      if (stopDisplay) stopDisplay();
       controls.dispose();
       clearTextures();
       if (sceneTexture) sceneTexture.dispose();

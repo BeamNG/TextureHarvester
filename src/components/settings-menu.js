@@ -7,9 +7,14 @@ TX.components.SettingsMenu = {
     settings: { type: Object, required: true },
     panels: { type: Array, default: () => [] },
   },
-  emits: ["toggle-panel", "reset-layout", "show-shortcuts"],
+  emits: ["toggle-panel", "reset-layout", "show-shortcuts", "show-intro"],
   setup() {
-    return { icons: TX.icons.app, i18n: TX.i18n.status, model: TX.depthModel.MODEL };
+    return {
+      icons: TX.icons.app,
+      i18n: TX.i18n.status,
+      model: TX.depthModel.MODEL,
+      device: TX.device.status,
+    };
   },
   data() {
     return { open: false };
@@ -65,6 +70,10 @@ TX.components.SettingsMenu = {
     },
     showShortcuts() {
       this.$emit("show-shortcuts");
+      this.open = false;
+    },
+    showIntro() {
+      this.$emit("show-intro");
       this.open = false;
     },
   },
@@ -194,12 +203,18 @@ TX.components.SettingsMenu = {
           <v-divider class="my-2" />
 
           <div class="tx-settings-section">{{ t('settings.section.help') }}</div>
+          <button type="button" class="tx-settings-item"
+                  v-tip="t('settings.intro.tip')"
+                  @click="showIntro">
+            <v-icon :icon="icons.help" size="14" />
+            <span>{{ t('settings.intro') }}</span>
+          </button>
           <button type="button" class="tx-settings-item tx-settings-shortcuts"
                   v-tip="t('settings.shortcuts.tip')"
                   @click="showShortcuts">
             <v-icon :icon="icons.help" size="14" />
             <span>{{ t('settings.shortcuts') }}</span>
-            <kbd>F1</kbd>
+            <kbd v-if="!device.touch">F1</kbd>
           </button>
         </div>
       </div>

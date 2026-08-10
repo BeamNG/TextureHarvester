@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.5.0] — 2026-08-10
+
+### Added
+- Compact mobile layout: one panel at a time with a tab strip; desktop dock layout kept separately
+- First-run intro walkthrough (reopen from the help icon or Settings), with touch-aware steps and control previews
+- Live dots on tabs when a panel has something useful (photo, texture, preview-ready selection, depth)
+- Help button in the toolbar
+
+### Changed
+- Touch tutorials and status hints use long-press / tap instead of Ctrl+click
+- Import and Export are primary toolbar actions; undo/redo and GitHub sit on the right
+- Shorter mobile tab labels (Tiles, 3D, Props); clearer active-tab chrome
+- Canvas and 3D preview follow screen DPI up to 3× and rebuild on browser zoom
+
+### Fixed
+- Page zoom no longer leaves canvases soft or mis-sized
+- 3D tab no longer lights up for a photo that has no depth yet
+
 ## [0.4.1] — 2026-08-10
 
 ### Fixed

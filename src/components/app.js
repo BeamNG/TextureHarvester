@@ -16,12 +16,12 @@ const PANEL_META = {
   properties: { closable: true },
 };
 
-function panelDefs() {
+function panelDefs(compact) {
   const out = {};
   for (const id of Object.keys(PANEL_META)) {
     out[id] = {
       ...PANEL_META[id],
-      title: TX.t(`panels.${id}.title`),
+      title: TX.t(compact ? `panels.${id}.title_short` : `panels.${id}.title`),
       hint: TX.t(`panels.${id}.hint`),
     };
   }
@@ -38,6 +38,8 @@ const defaultLayout = () => tree.split("row", [
   tree.tabs(["properties"]),
 ], [0.78, 0.22]);
 
+const mobileLayout = () => tree.tabs(["mark", "atlas", "tiling", "preview3d", "properties"]);
+
 function canvasHost() {
   const el = document.createElement("div");
   el.className = "tx-canvas";
@@ -53,6 +55,7 @@ TX.components.App = {
     Measure: TX.components.Measure,
     ContextMenu: TX.components.ContextMenu,
     ShortcutsDialog: TX.components.ShortcutsDialog,
+    Intro: TX.components.Intro,
     Dock: TX.components.Dock,
     Properties: TX.components.Properties,
     Preview3d: TX.components.Preview3d,
@@ -66,6 +69,7 @@ TX.components.App = {
       icons: TX.icons.app,
       history: TX.history.status,
       i18n: TX.i18n.status,
+      device: TX.device.status,
     };
   },
   data() {
@@ -85,6 +89,7 @@ TX.components.App = {
       storedHistory: null,
       menu: { open: false, position: [0, 0], items: [] },
       helpOpen: false,
+      introOpen: false,
       notice: { open: false, text: "", color: "info" },
       unsupported: false,
     };
@@ -120,7 +125,23 @@ TX.components.App = {
     },
     panelDefs() {
       void this.i18n.locale;
-      return panelDefs();
+      void this.device.compact;
+      return panelDefs(this.device.compact);
+    },
+    sourceTutorialLead() {
+      void this.i18n.locale;
+      return this.t(this.device.touch
+        ? "source.empty.tutorial_touch" : "source.empty.tutorial");
+    },
+    sourceTutorialEdge() {
+      void this.i18n.locale;
+      return this.t(this.device.touch
+        ? "source.empty.tutorial_edge_touch" : "source.empty.tutorial_edge");
+    },
+    atlasTutorialDetail() {
+      void this.i18n.locale;
+      return this.t(this.device.touch
+        ? "atlas.empty.tutorial_detail_touch" : "atlas.empty.tutorial_detail");
     },
     activePanelTitle() {
       const panel = this.panelDefs[this.state.activePanel];
@@ -140,6 +161,27 @@ TX.components.App = {
         hint: panels[id].hint,
         visible: this.isPanelVisible(id),
       }));
+    },
+    panelSignals() {
+      void this.state.depthEpoch;
+      const tex = this.stats.selectedTextures;
+      const hasSel = !!this.stats.kind && this.stats.selected > 0;
+      let preview3d = tex === 1;
+      if (!preview3d) {
+        const image = TX.store.soleSelected("image")
+          || (() => {
+            const mark = TX.store.soleSelected("mark");
+            return mark ? TX.store.findImage(mark.imageId) : null;
+          })();
+        preview3d = !!(image && TX.store.imageDepth(image.id));
+      }
+      return {
+        mark: this.stats.images > 0,
+        atlas: this.stats.textures > 0,
+        tiling: tex === 1,
+        preview3d,
+        properties: hasSel,
+      };
     },
   },
   methods: {
@@ -181,8 +223,19 @@ TX.components.App = {
     },
     resetLayout() {
       this.dockState.reset();
-      TX.dock.save(this.dockState);
       this.notify(this.t("app.notify.layout_reset"), "info");
+    },
+
+    syncDeviceLayout() {
+      if (!this.dockState || !this.dockState.setMode) return;
+      this.dockState.setMode(this.device.compact ? "mobile" : "desktop");
+    },
+
+    openIntro() {
+      this.introOpen = true;
+    },
+    onIntroStart() {
+      this.pickFiles();
     },
 
     pickFiles() {
@@ -217,13 +270,14 @@ TX.components.App = {
       this.$nextTick(() => { this.menu.open = true; });
     },
     historyItems() {
+      const touch = this.device.touch;
       return [
         {
           title: this.history.canUndo
             ? this.t("context.undo_named", { label: this.history.undoLabel.toLowerCase() })
             : this.t("context.undo"),
           icon: this.icons.undo,
-          hint: this.t("context.hint.undo"),
+          hint: touch ? "" : this.t("context.hint.undo"),
           disabled: !this.history.canUndo,
           action: () => this.undo(),
         },
@@ -232,7 +286,7 @@ TX.components.App = {
             ? this.t("context.redo_named", { label: this.history.redoLabel.toLowerCase() })
             : this.t("context.redo"),
           icon: this.icons.redo,
-          hint: this.t("context.hint.redo"),
+          hint: touch ? "" : this.t("context.hint.redo"),
           disabled: !this.history.canRedo,
           action: () => this.redo(),
         },
@@ -240,6 +294,7 @@ TX.components.App = {
       ];
     },
     markMenuItems(context) {
+      const touch = this.device.touch;
       const marks = TX.store.selectionCount("mark");
       const images = TX.store.selectionCount("image");
       const noun = marks ? "mark" : "image";
@@ -251,12 +306,13 @@ TX.components.App = {
         : (selected === 1 ? "context.delete_n_image_one" : "context.delete_n_image_other");
       return [
         ...this.historyItems(),
-        { title: this.t("context.import_images"), icon: this.icons.load, hint: this.t("context.hint.import"),
+        { title: this.t("context.import_images"), icon: this.icons.load,
+          hint: touch ? "" : this.t("context.hint.import"),
           action: () => this.pickFiles() },
         {
           title: this.t("context.extract_modified"),
           icon: this.icons.extract,
-          hint: this.t("context.hint.extract"),
+          hint: touch ? "" : this.t("context.hint.extract"),
           disabled: !this.dirtyCount,
           action: () => this.actions.convert("all"),
         },
@@ -278,7 +334,7 @@ TX.components.App = {
         { divider: true },
         {
           title: marks ? this.t("context.select_all_marks") : this.t("context.select_all_images"),
-          hint: this.t("context.hint.select_all"),
+          hint: touch ? "" : this.t("context.hint.select_all"),
           action: () => this.mark.selectAll(),
         },
         {
@@ -286,7 +342,7 @@ TX.components.App = {
             ? this.t(deleteSelected, { count: selected })
             : this.t(noun === "mark" ? "context.delete_selected_marks" : "context.delete_selected_images"),
           icon: this.icons.trash,
-          hint: this.t("context.hint.delete"),
+          hint: touch ? "" : this.t("context.hint.delete"),
           disabled: !selected,
           action: () => this.deleteInPane("mark"),
         },
@@ -295,6 +351,7 @@ TX.components.App = {
       ];
     },
     atlasMenuItems() {
+      const touch = this.device.touch;
       const selected = TX.store.selectionCount("texture");
       const total = this.state.textures.length;
       const sole = TX.store.soleSelected("texture");
@@ -304,21 +361,21 @@ TX.components.App = {
         { title: this.t("context.pack_atlas"), icon: this.icons.pack, disabled: !total,
           action: () => this.actions.packAtlas() },
         { title: this.t("context.export_atlas_png"), icon: this.icons.download,
-          hint: this.t("context.hint.export_atlas"), disabled: !total,
+          hint: touch ? "" : this.t("context.hint.export_atlas"), disabled: !total,
           action: () => this.actions.exportAtlas() },
         {
           title: selected
             ? this.t("context.export_n_textures", { count: selected })
             : this.t("context.export_all_individually"),
           icon: this.icons.download,
-          hint: this.t("context.hint.export_individually"),
+          hint: touch ? "" : this.t("context.hint.export_individually"),
           disabled: !total,
           action: () => this.actions.exportIndividually(),
         },
         {
           title: this.t("context.export_glb"),
           icon: this.icons.download,
-          hint: this.t("context.hint.export_glb"),
+          hint: touch ? "" : this.t("context.hint.export_glb"),
           disabled: !single,
           action: () => single && this.actions.exportGlb(single),
         },
@@ -341,7 +398,7 @@ TX.components.App = {
         { divider: true },
         {
           title: this.t("context.flatten_lighting"),
-          hint: this.t("context.hint.flatten"),
+          hint: touch ? "" : this.t("context.hint.flatten"),
           disabled: !selected,
           action: () => this.flattenSelectedLighting(),
         },
@@ -353,7 +410,7 @@ TX.components.App = {
         { divider: true },
         {
           title: this.t("context.copy_clipboard"),
-          hint: this.t("context.hint.copy"),
+          hint: touch ? "" : this.t("context.hint.copy"),
           disabled: !single,
           action: () => this.copySelectedTexture(),
         },
@@ -361,13 +418,13 @@ TX.components.App = {
           title: selected
             ? this.t("context.duplicate_n", { count: selected })
             : this.t("context.duplicate"),
-          hint: this.t("context.hint.duplicate"),
+          hint: touch ? "" : this.t("context.hint.duplicate"),
           disabled: !selected,
           action: () => this.duplicateSelectedTextures(),
         },
         {
           title: this.t("context.reset_local_space"),
-          hint: this.t("context.hint.reset_local"),
+          hint: touch ? "" : this.t("context.hint.reset_local"),
           disabled: !this.selectedLocalSpaceMark,
           action: () => {
             const m = this.selectedLocalSpaceMark;
@@ -385,14 +442,15 @@ TX.components.App = {
           disabled: !total,
           action: () => this.atlas.resetTransforms(),
         },
-        { title: this.t("context.select_all_textures"), hint: this.t("context.hint.select_all"),
+        { title: this.t("context.select_all_textures"),
+          hint: touch ? "" : this.t("context.hint.select_all"),
           disabled: !total, action: () => this.atlas.selectAll() },
         {
           title: selected
             ? this.t("context.delete_n_textures", { count: selected })
             : this.t("context.delete_selected_textures"),
           icon: this.icons.trash,
-          hint: this.t("context.hint.delete"),
+          hint: touch ? "" : this.t("context.hint.delete"),
           disabled: !selected,
           action: () => this.deleteInPane("atlas"),
         },
@@ -600,6 +658,11 @@ TX.components.App = {
         return;
       }
       if (key === "escape") {
+        if (this.introOpen) {
+          this.introOpen = false;
+          TX.intro.saveSeen();
+          return;
+        }
         if (!this.state.pending.points.length && this.state.selection.kind) {
           TX.store.clearSelection();
         }
@@ -620,7 +683,13 @@ TX.components.App = {
       return;
     }
 
-    this.dockState = TX.dock.createState(defaultLayout, PANEL_IDS);
+    TX.device.start();
+    this.dockState = TX.dock.createState(defaultLayout, PANEL_IDS, mobileLayout);
+    this.introOpen = !TX.intro.loadSeen();
+    this.stopDevice = watch(
+      () => this.device.compact,
+      () => this.syncDeviceLayout(),
+    );
 
     const hooks = {
       onContextMenu: (event, context) => this.openMenu(event, context),
@@ -727,6 +796,8 @@ TX.components.App = {
 
   beforeUnmount() {
     window.removeEventListener("keydown", this.onKeyDown);
+    if (this.stopDevice) this.stopDevice();
+    if (this.stopFollow) this.stopFollow();
     if (this.mark) this.mark.dispose();
     if (this.atlas) this.atlas.dispose();
     if (this.tilingPanel) this.tilingPanel.dispose();
@@ -742,6 +813,7 @@ TX.components.App = {
       </div>
 
       <div v-else class="tx-shell"
+           :class="{ 'tx-shell--compact': device.compact, 'tx-shell--touch': device.touch }"
            @dragenter.prevent="onDragEnter" @dragover.prevent
            @dragleave.prevent="onDragLeave" @drop.prevent="onDrop">
         <Toolbar :busy="state.busy"
@@ -754,18 +826,21 @@ TX.components.App = {
                  @export-selected="actions.exportIndividually()"
                  @export-model="actions.exportGlb()"
                  @undo="undo" @redo="redo"
-                 @clear="confirmClear">
+                 @clear="confirmClear"
+                 @help="openIntro">
           <template #view>
             <Measure />
 
             <SettingsMenu :settings="state.settings" :panels="panelList"
                           @toggle-panel="togglePanel" @reset-layout="resetLayout"
-                          @show-shortcuts="helpOpen = true" />
+                          @show-shortcuts="helpOpen = true"
+                          @show-intro="openIntro" />
           </template>
         </Toolbar>
 
         <div class="tx-dock-area">
-          <Dock v-if="dockState" ref="dock" :state="dockState" :panels="panelDefs" />
+          <Dock v-if="dockState" ref="dock" :state="dockState" :panels="panelDefs"
+                :compact="device.compact" :signals="panelSignals" />
         </div>
 
         <StatusBar :storage-kind="state.storageKind" :stats="stats"
@@ -780,13 +855,13 @@ TX.components.App = {
           <p class="tx-source-empty-lead">{{ t('source.empty.drop') }}</p>
           <v-btn variant="tonal" size="small" class="tx-action" :prepend-icon="icons.load"
                  @click="pickFiles">{{ t('toolbar.import') }}</v-btn>
-          <p>{{ t('source.empty.or_import') }}</p>
+          <p v-if="!device.touch">{{ t('source.empty.or_import') }}</p>
         </div>
         <div v-else-if="sourceTutorial" class="tx-source-tip" role="status">
           <span class="tx-source-tip-emoji" aria-hidden="true">💡</span>
           <div class="tx-source-tip-body">
-            <p class="tx-source-tip-lead">{{ t('source.empty.tutorial') }}</p>
-            <p>{{ t('source.empty.tutorial_edge') }}</p>
+            <p class="tx-source-tip-lead">{{ sourceTutorialLead }}</p>
+            <p>{{ sourceTutorialEdge }}</p>
           </div>
         </div>
       </Teleport>
@@ -796,7 +871,7 @@ TX.components.App = {
           <span class="tx-source-tip-emoji" aria-hidden="true">✂️</span>
           <div class="tx-source-tip-body">
             <p class="tx-source-tip-lead">{{ t('atlas.empty.tutorial') }}</p>
-            <p>{{ t('atlas.empty.tutorial_detail') }}</p>
+            <p>{{ atlasTutorialDetail }}</p>
           </div>
         </div>
       </Teleport>
@@ -819,6 +894,7 @@ TX.components.App = {
 
       <ContextMenu v-model="menu.open" :position="menu.position" :items="menu.items" />
       <ShortcutsDialog v-model="helpOpen" />
+      <Intro v-model="introOpen" @start="onIntroStart" />
 
       <v-snackbar v-model="notice.open" :color="notice.color" timeout="2600" location="bottom right">
         {{ notice.text }}
